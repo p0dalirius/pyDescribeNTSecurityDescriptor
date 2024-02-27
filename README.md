@@ -1,7 +1,7 @@
 ![](./.github/banner.png)
 
 <p align="center">
-  Parse and describe the contents of a raw ntSecurityDescriptor structure
+  A python tool to parse and describe the contents of a raw `ntSecurityDescriptor` structure.
   <br>
   <img alt="GitHub release (latest by date)" src="https://img.shields.io/github/v/release/p0dalirius/DescribeNTSecurityDescriptor">
   <a href="https://twitter.com/intent/follow?screen_name=podalirius_" title="Follow"><img src="https://img.shields.io/twitter/follow/podalirius_?label=Podalirius&style=social"></a>
@@ -33,11 +33,20 @@
 
 ## Demonstration
 
-Here is an example of the output of the tool when parsing the ntSecurityDescriptor contained in the file [example_value.txt](./example_value.txt):
+Here is an example of the output of the tool when parsing the ntSecurityDescriptor contained in the file [example_value.txt](./example_value.txt). This file contains a raw `ntSecurityDescriptor` structure in hex dump format:
+
+```
+0100148cc4090000e0090000140000008c0000000400780002000000075a38002000000003000000be3b0ef3f09fd111b6030000f80367c1a57a96bfe60dd011a28500aa003049e2010100000000000100000000075a38002000000003000000bf3b0ef3f09fd111b60300
+...
+02000000000005200000002a02000000121800bd010f0001020000000000052000000020020000010500000000000515000000a3cd06bf0e0fe808c335b8e600020000010500000000000515000000a3cd06bf0e0fe808c335b8e600020000
+```
+
+Using [DescribeNTSecurityDescriptor.py](./DescribeNTSecurityDescriptor.py), we can open the file and parse its content precisely: 
 
 ```
 ./DescribeNTSecurityDescriptor.py ./example_value.txt
 ```
+
 ![example of the output](./.github/example.png)
 
 ## Usage
