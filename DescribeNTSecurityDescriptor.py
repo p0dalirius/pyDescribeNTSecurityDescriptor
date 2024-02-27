@@ -15,6 +15,9 @@ import struct
 import sys
 
 
+VERSION = "1.1"
+
+
 class ExtendedRights(Enum):
     """
     ExtendedRights is an enumeration of GUIDs representing various extended rights in Active Directory.
@@ -1678,6 +1681,8 @@ def parseArgs():
 
 if __name__ == "__main__":
     options = parseArgs()
+
+    print("DescribeNTSecurityDescriptor.py v%s - by @podalirius_\n" % VERSION)
 
     if os.path.isfile(options.value):
         print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
