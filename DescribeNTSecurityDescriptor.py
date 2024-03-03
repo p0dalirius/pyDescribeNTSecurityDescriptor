@@ -1166,32 +1166,447 @@ class AccessControlEntry(object):
         
         # Parsing header
         self.header = AccessControlEntry_Header(value=self.value, verbose=self.verbose)
-
-        # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/72e7c7ea-bc02-4c74-a619-818a16bf6adb
-
         self.value = self.value[self.header.bytesize:]
         self.bytesize = self.header.bytesize
+        
+        if (self.header.AceType.value == AccessControlEntry_Type.ACCESS_ALLOWED_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_ALLOWED_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/72e7c7ea-bc02-4c74-a619-818a16bf6adb
+            
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+            
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_DENIED_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_DENIED_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/b1e1321d-5816-4513-be67-b65d8ae52fe8
 
-        # Parsing Mask
-        self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
-        self.value = self.value[self.mask.bytesize:]
-        self.bytesize += self.mask.bytesize
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
 
-        # This is an extended structure
-        flags_implying_extended = [
-            AccessControlEntry_Type.ACCESS_ALLOWED_OBJECT_ACE_TYPE,
-            AccessControlEntry_Type.ACCESS_DENIED_OBJECT_ACE_TYPE,
-            AccessControlEntry_Type.SYSTEM_AUDIT_OBJECT_ACE_TYPE,
-            AccessControlEntry_Type.SYSTEM_ALARM_OBJECT_ACE_TYPE
-        ]
-        if any([(f.value & self.header.AceType.value) for f in flags_implying_extended]):
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_AUDIT_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_AUDIT_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/9431fd0f-5b9a-47f0-b3f0-3015e2d0d4f9
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            # An access attempt of a kind specified by the Mask field by any trustee whose SID
+            # matches the Sid field causes the system to generate an audit message. If an application
+            # does not specify a SID for this field, audit messages are generated for the specified
+            # access rights for all trustees.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_ALARM_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_ALARM_ACE_TYPE
+            # Source: ?
+            
+            # Reserved for future use.
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
+
+            pass
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_ALLOWED_COMPOUND_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_ALLOWED_COMPOUND_ACE_TYPE
+            # Source: ?
+            
+            # Reserved for future use.
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
+
+            pass
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_ALLOWED_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_ALLOWED_OBJECT_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/c79a383c-2b3f-4655-abe7-dcbb7ce0cfbe
+            
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Flags  (4 bytes): A 32-bit unsigned integer that specifies a set of bit flags that
+            # indicate whether the ObjectType and InheritedObjectType fields contain valid data.
+            # This parameter can be one or more of the following values.
+            #
+            # ObjectType (16 bytes): A GUID that identifies a property set, property, extended right,
+            # or type of child object. The purpose of this GUID depends on the user rights specified
+            # in the Mask field. This field is valid only if the ACE _OBJECT_TYPE_PRESENT bit is set
+            # in the Flags field. Otherwise, the ObjectType field is ignored. For information on
+            # access rights and for a mapping of the control access rights to the corresponding GUID
+            # value that identifies each right, see [MS-ADTS] sections 5.1.3.2 and 5.1.3.2.1.
+            # ACCESS_MASK bits are not mutually exclusive. Therefore, the ObjectType field can be set
+            # in an ACE with any ACCESS_MASK. If the AccessCheck algorithm calls this ACE and does not
+            # find an appropriate GUID, then that ACE will be ignored. For more information on access
+            # checks and object access, see [MS-ADTS] section 5.1.3.3.3.
+            # 
+            # InheritedObjectType (16 bytes): A GUID that identifies the type of child object that
+            # can inherit the ACE. Inheritance is also controlled by the inheritance flags in the
+            # ACE_HEADER, as well as by any protection against inheritance placed on the child
+            # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
+            # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
             self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
             self.value = self.value[self.object_type.bytesize:]
             self.bytesize += self.object_type.bytesize
 
-        self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
-        self.value = self.value[self.ace_sid.bytesize:]
-        self.bytesize += self.ace_sid.bytesize
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_DENIED_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_DENIED_OBJECT_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/8720fcf3-865c-4557-97b1-0b3489a6c270
+                        
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Flags  (4 bytes): A 32-bit unsigned integer that specifies a set of bit flags that
+            # indicate whether the ObjectType and InheritedObjectType fields contain valid data.
+            # This parameter can be one or more of the following values.
+            #
+            # ObjectType (16 bytes): A GUID that identifies a property set, property, extended right,
+            # or type of child object. The purpose of this GUID depends on the user rights specified
+            # in the Mask field. This field is valid only if the ACE _OBJECT_TYPE_PRESENT bit is set
+            # in the Flags field. Otherwise, the ObjectType field is ignored. For information on
+            # access rights and for a mapping of the control access rights to the corresponding GUID
+            # value that identifies each right, see [MS-ADTS] sections 5.1.3.2 and 5.1.3.2.1.
+            # ACCESS_MASK bits are not mutually exclusive. Therefore, the ObjectType field can be set
+            # in an ACE with any ACCESS_MASK. If the AccessCheck algorithm calls this ACE and does not
+            # find an appropriate GUID, then that ACE will be ignored. For more information on access
+            # checks and object access, see [MS-ADTS] section 5.1.3.3.3.
+            # 
+            # InheritedObjectType (16 bytes): A GUID that identifies the type of child object that
+            # can inherit the ACE. Inheritance is also controlled by the inheritance flags in the
+            # ACE_HEADER, as well as by any protection against inheritance placed on the child
+            # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
+            # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
+            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.object_type.bytesize:]
+            self.bytesize += self.object_type.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_AUDIT_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_AUDIT_OBJECT_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/c8da72ae-6b54-4a05-85f4-e2594936d3d5
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Flags  (4 bytes): A 32-bit unsigned integer that specifies a set of bit flags that
+            # indicate whether the ObjectType and InheritedObjectType fields contain valid data.
+            # This parameter can be one or more of the following values.
+            #
+            # ObjectType (16 bytes): A GUID that identifies a property set, property, extended right,
+            # or type of child object. The purpose of this GUID depends on the user rights specified
+            # in the Mask field. This field is valid only if the ACE _OBJECT_TYPE_PRESENT bit is set
+            # in the Flags field. Otherwise, the ObjectType field is ignored. For information on
+            # access rights and for a mapping of the control access rights to the corresponding GUID
+            # value that identifies each right, see [MS-ADTS] sections 5.1.3.2 and 5.1.3.2.1.
+            # ACCESS_MASK bits are not mutually exclusive. Therefore, the ObjectType field can be set
+            # in an ACE with any ACCESS_MASK. If the AccessCheck algorithm calls this ACE and does not
+            # find an appropriate GUID, then that ACE will be ignored. For more information on access
+            # checks and object access, see [MS-ADTS] section 5.1.3.3.3.
+            # 
+            # InheritedObjectType (16 bytes): A GUID that identifies the type of child object that
+            # can inherit the ACE. Inheritance is also controlled by the inheritance flags in the
+            # ACE_HEADER, as well as by any protection against inheritance placed on the child
+            # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
+            # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
+            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.object_type.bytesize:]
+            self.bytesize += self.object_type.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_ALARM_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_ALARM_OBJECT_ACE_TYPE
+            # Source: ?
+            
+            # Reserved for future use.
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
+
+            pass
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_ALLOWED_CALLBACK_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_ALLOWED_CALLBACK_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/c9579cf4-0f4a-44f1-9444-422dfb10557a
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_DENIED_CALLBACK_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_DENIED_CALLBACK_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/35adad6b-fda5-4cc1-b1b5-9beda5b07d2e
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_ALLOWED_CALLBACK_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_ALLOWED_CALLBACK_OBJECT_ACE_TYPE
+            # Source: 
+            
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Flags  (4 bytes): A 32-bit unsigned integer that specifies a set of bit flags that
+            # indicate whether the ObjectType and InheritedObjectType fields contain valid data.
+            # This parameter can be one or more of the following values.
+            #
+            # ObjectType (16 bytes): A GUID that identifies a property set, property, extended right,
+            # or type of child object. The purpose of this GUID depends on the user rights specified
+            # in the Mask field. This field is valid only if the ACE _OBJECT_TYPE_PRESENT bit is set
+            # in the Flags field. Otherwise, the ObjectType field is ignored. For information on
+            # access rights and for a mapping of the control access rights to the corresponding GUID
+            # value that identifies each right, see [MS-ADTS] sections 5.1.3.2 and 5.1.3.2.1.
+            # ACCESS_MASK bits are not mutually exclusive. Therefore, the ObjectType field can be set
+            # in an ACE with any ACCESS_MASK. If the AccessCheck algorithm calls this ACE and does not
+            # find an appropriate GUID, then that ACE will be ignored. For more information on access
+            # checks and object access, see [MS-ADTS] section 5.1.3.3.3.
+            # 
+            # InheritedObjectType (16 bytes): A GUID that identifies the type of child object that
+            # can inherit the ACE. Inheritance is also controlled by the inheritance flags in the
+            # ACE_HEADER, as well as by any protection against inheritance placed on the child
+            # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
+            # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
+            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.object_type.bytesize:]
+            self.bytesize += self.object_type.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.ACCESS_DENIED_CALLBACK_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type ACCESS_DENIED_CALLBACK_OBJECT_ACE_TYPE
+            # Source: 
+            
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Flags  (4 bytes): A 32-bit unsigned integer that specifies a set of bit flags that
+            # indicate whether the ObjectType and InheritedObjectType fields contain valid data.
+            # This parameter can be one or more of the following values.
+            #
+            # ObjectType (16 bytes): A GUID that identifies a property set, property, extended right,
+            # or type of child object. The purpose of this GUID depends on the user rights specified
+            # in the Mask field. This field is valid only if the ACE _OBJECT_TYPE_PRESENT bit is set
+            # in the Flags field. Otherwise, the ObjectType field is ignored. For information on
+            # access rights and for a mapping of the control access rights to the corresponding GUID
+            # value that identifies each right, see [MS-ADTS] sections 5.1.3.2 and 5.1.3.2.1.
+            # ACCESS_MASK bits are not mutually exclusive. Therefore, the ObjectType field can be set
+            # in an ACE with any ACCESS_MASK. If the AccessCheck algorithm calls this ACE and does not
+            # find an appropriate GUID, then that ACE will be ignored. For more information on access
+            # checks and object access, see [MS-ADTS] section 5.1.3.3.3.
+            # 
+            # InheritedObjectType (16 bytes): A GUID that identifies the type of child object that
+            # can inherit the ACE. Inheritance is also controlled by the inheritance flags in the
+            # ACE_HEADER, as well as by any protection against inheritance placed on the child
+            # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
+            # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
+            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.object_type.bytesize:]
+            self.bytesize += self.object_type.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_AUDIT_CALLBACK_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_AUDIT_CALLBACK_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/bd6b6fd8-4bef-427e-9a43-b9b46457e934
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_ALARM_CALLBACK_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_ALARM_CALLBACK_ACE_TYPE
+            # Source: ?
+            
+            # Reserved for future use.
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
+
+            pass
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_AUDIT_CALLBACK_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_AUDIT_CALLBACK_OBJECT_ACE_TYPE
+            # Source: 
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+
+            # Flags  (4 bytes): A 32-bit unsigned integer that specifies a set of bit flags that
+            # indicate whether the ObjectType and InheritedObjectType fields contain valid data.
+            # This parameter can be one or more of the following values.
+            #
+            # ObjectType (16 bytes): A GUID that identifies a property set, property, extended right,
+            # or type of child object. The purpose of this GUID depends on the user rights specified
+            # in the Mask field. This field is valid only if the ACE _OBJECT_TYPE_PRESENT bit is set
+            # in the Flags field. Otherwise, the ObjectType field is ignored. For information on
+            # access rights and for a mapping of the control access rights to the corresponding GUID
+            # value that identifies each right, see [MS-ADTS] sections 5.1.3.2 and 5.1.3.2.1.
+            # ACCESS_MASK bits are not mutually exclusive. Therefore, the ObjectType field can be set
+            # in an ACE with any ACCESS_MASK. If the AccessCheck algorithm calls this ACE and does not
+            # find an appropriate GUID, then that ACE will be ignored. For more information on access
+            # checks and object access, see [MS-ADTS] section 5.1.3.3.3.
+            # 
+            # InheritedObjectType (16 bytes): A GUID that identifies the type of child object that
+            # can inherit the ACE. Inheritance is also controlled by the inheritance flags in the
+            # ACE_HEADER, as well as by any protection against inheritance placed on the child
+            # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
+            # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
+            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.object_type.bytesize:]
+            self.bytesize += self.object_type.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_ALARM_CALLBACK_OBJECT_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_ALARM_CALLBACK_OBJECT_ACE_TYPE
+            # Source: ?
+            
+            # Reserved for future use.
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586 
+
+            pass
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_MANDATORY_LABEL_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_MANDATORY_LABEL_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/25fa6565-6cb0-46ab-a30a-016b32c4939a
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+            
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_RESOURCE_ATTRIBUTE_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_RESOURCE_ATTRIBUTE_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/352944c7-4fb6-4988-8036-0a25dcedc730
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
+
+        elif (self.header.AceType.value == AccessControlEntry_Type.SYSTEM_SCOPED_POLICY_ID_ACE_TYPE.value):
+            # Parsing ACE of type SYSTEM_SCOPED_POLICY_ID_ACE_TYPE
+            # Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/aa0c0f62-4b4c-44f0-9718-c266a6accd9f
+
+            # Mask (4 bytes): An ACCESS_MASK that specifies the user rights allowed by this ACE.
+            self.mask = AccessControlMask(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.mask.bytesize:]
+            self.bytesize += self.mask.bytesize
+
+            # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
+            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.value = self.value[self.ace_sid.bytesize:]
+            self.bytesize += self.ace_sid.bytesize
+
+            # ApplicationData (variable): Optional application data. The size of the application
+            # data is determined by the AceSize field of the ACE_HEADER.
+            # TODO
 
         if self.verbose:
             self.describe()
@@ -1666,6 +2081,8 @@ class NTSecurityDescriptor(object):
 
 
 def parseArgs():
+    print("DescribeNTSecurityDescriptor.py v%s - by @podalirius_\n" % VERSION)
+
     parser = argparse.ArgumentParser(add_help=True, description="Parse and describe the contents of a raw ntSecurityDescriptor structure")
 
     parser.add_argument("-v", "--verbose", default=False, action="store_true", help="Verbose mode. (default: False)")
@@ -1681,8 +2098,6 @@ def parseArgs():
 
 if __name__ == "__main__":
     options = parseArgs()
-
-    print("DescribeNTSecurityDescriptor.py v%s - by @podalirius_\n" % VERSION)
 
     if os.path.isfile(options.value):
         print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
