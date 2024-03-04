@@ -8,6 +8,10 @@ import argparse
 import binascii
 from enum import Enum, IntFlag
 import io
+import ldap3
+from ldap3.protocol.formatters.formatters import format_sid
+from sectools.windows.ldap import raw_ldap_query, init_ldap_session
+from sectools.windows.crypto import nt_hash, parse_lm_nt_hashes
 import os
 import random
 import re
@@ -15,7 +19,130 @@ import struct
 import sys
 
 
-VERSION = "1.1"
+VERSION = "1.2"
+
+
+# LDAP controls
+# https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/3c5e87db-4728-4f29-b164-01dd7d7391ea
+LDAP_PAGED_RESULT_OID_STRING = "1.2.840.113556.1.4.319"
+# https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/f14f3610-ee22-4d07-8a24-1bf1466cba5f
+LDAP_SERVER_NOTIFICATION_OID = "1.2.840.113556.1.4.528"
+
+class LDAPSearcher(object):
+    def __init__(self, ldap_server, ldap_session):
+        super(LDAPSearcher, self).__init__()
+        self.ldap_server = ldap_server
+        self.ldap_session = ldap_session
+
+    def query(self, base_dn, query, attributes=['*'], page_size=1000):
+        """
+        Executes an LDAP query with optional notification control.
+
+        This method performs an LDAP search operation based on the provided query and attributes. It supports
+        pagination to handle large datasets and can optionally enable notification control to receive updates
+        about changes in the LDAP directory.
+
+        Parameters:
+        - query (str): The LDAP query string.
+        - attributes (list of str): A list of attribute names to include in the search results. Defaults to ['*'], which returns all attributes.
+        - notify (bool): If True, enables the LDAP server notification control to receive updates about changes. Defaults to False.
+
+        Returns:
+        - dict: A dictionary where each key is a distinguished name (DN) and each value is a dictionary of attributes for that DN.
+
+        Raises:
+        - ldap3.core.exceptions.LDAPInvalidFilterError: If the provided query string is not a valid LDAP filter.
+        - Exception: For any other issues encountered during the search operation.
+        """
+
+        results = {}
+        try:
+            # https://ldap3.readthedocs.io/en/latest/searches.html#the-search-operation
+            paged_response = True
+            paged_cookie = None
+            while paged_response == True:
+                self.ldap_session.search(
+                    base_dn,
+                    query,
+                    attributes=attributes,
+                    size_limit=0,
+                    paged_size=page_size,
+                    paged_cookie=paged_cookie
+                )
+                if "controls" in self.ldap_session.result.keys():
+                    if LDAP_PAGED_RESULT_OID_STRING in self.ldap_session.result["controls"].keys():
+                        next_cookie = self.ldap_session.result["controls"][LDAP_PAGED_RESULT_OID_STRING]["value"]["cookie"]
+                        if len(next_cookie) == 0:
+                            paged_response = False
+                        else:
+                            paged_response = True
+                            paged_cookie = next_cookie
+                    else:
+                        paged_response = False
+                else:
+                    paged_response = False
+                for entry in self.ldap_session.response:
+                    if entry['type'] != 'searchResEntry':
+                        continue
+                    results[entry['dn']] = entry["attributes"]
+        except ldap3.core.exceptions.LDAPInvalidFilterError as e:
+            print("Invalid Filter. (ldap3.core.exceptions.LDAPInvalidFilterError)")
+        except Exception as e:
+            raise e
+        return results
+
+    def query_all_naming_contexts(self, query, attributes=['*'], page_size=1000):
+        """
+        Queries all naming contexts on the LDAP server with the given query and attributes.
+
+        This method iterates over all naming contexts retrieved from the LDAP server's information,
+        performing a paged search for each context using the provided query and attributes. The results
+        are aggregated and returned as a dictionary where each key is a distinguished name (DN) and
+        each value is a dictionary of attributes for that DN.
+
+        Parameters:
+        - query (str): The LDAP query to execute.
+        - attributes (list of str): A list of attribute names to retrieve for each entry. Defaults to ['*'] which fetches all attributes.
+
+        Returns:
+        - dict: A dictionary where each key is a DN and each value is a dictionary of attributes for that DN.
+        """
+
+        results = {}
+        try:
+            for naming_context in self.ldap_server.info.naming_contexts:
+                paged_response = True
+                paged_cookie = None
+                while paged_response == True:
+                    self.ldap_session.search(
+                        naming_context,
+                        query,
+                        attributes=attributes,
+                        size_limit=0,
+                        paged_size=page_size,
+                        paged_cookie=paged_cookie
+                    )
+                    if "controls" in self.ldap_session.result.keys():
+                        if LDAP_PAGED_RESULT_OID_STRING in self.ldap_session.result["controls"].keys():
+                            next_cookie = self.ldap_session.result["controls"][LDAP_PAGED_RESULT_OID_STRING]["value"]["cookie"]
+                            if len(next_cookie) == 0:
+                                paged_response = False
+                            else:
+                                paged_response = True
+                                paged_cookie = next_cookie
+                        else:
+                            paged_response = False
+                    else:
+                        paged_response = False
+                    for entry in self.ldap_session.response:
+                        if entry['type'] != 'searchResEntry':
+                            continue
+                        results[entry['dn']] = entry["attributes"]
+        except ldap3.core.exceptions.LDAPInvalidFilterError as e:
+            print("Invalid Filter. (ldap3.core.exceptions.LDAPInvalidFilterError)")
+        except Exception as e:
+            raise e
+        return results
 
 
 class ExtendedRights(Enum):
@@ -671,9 +798,11 @@ class OwnerSID(object):
         describe(offset=0, indent=0): Prints a formatted description of the OwnerSID, including its offset, size, and SID value.
     """
 
-    def __init__(self, value, verbose=False):
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.verbose = verbose
         self.value = value
+        self.ldap_searcher = ldap_searcher
+        self.displayName = None
         #
         self.bytesize = 0
         #
@@ -689,6 +818,26 @@ class OwnerSID(object):
         self.sid = SID.fromRawBytes(self.value)
         self.bytesize = self.sid.bytesize
 
+        # Resolve display Name
+        __sid_str_repr = self.sid.toString()
+        if __sid_str_repr in self.sid.wellKnownSIDs.keys():
+            self.displayName = self.sid.wellKnownSIDs[__sid_str_repr]
+        
+        # Try to resolve it from the LDAP
+        if self.displayName is None:
+            if self.ldap_searcher is not None:
+                search_base = ldap_server.info.other["defaultNamingContext"][0]
+                __ldap_results = self.ldap_searcher.query(
+                    base_dn=search_base,
+                    query="(objectSid=%s)" % self.sid.toString(),
+                    attributes=["sAMAccountName"]
+                )
+                if len(__ldap_results.keys()) != 0:
+                    __dn = list(__ldap_results.keys())[0]
+                    __dc_string = "DC=" + __dn.split(',DC=',1)[1]
+                    __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
+                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn]["sAMAccountName"])
+
         if self.verbose:
             self.describe()
 
@@ -696,10 +845,10 @@ class OwnerSID(object):
         indent_prompt = "  │ " * indent
         print("%s<OwnerSID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
         str_repr = self.sid.toString()
-        if str_repr not in self.sid.wellKnownSIDs.keys():
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, str_repr))
+        if self.displayName is not None:
+            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
         else:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, str_repr, self.sid.wellKnownSIDs[str_repr]))
+            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
         print(''.join(["  │ "]*indent + ["  └─"]))
 
 
@@ -718,9 +867,11 @@ class GroupSID(object):
         describe(offset=0, indent=0): Prints a formatted description of the GroupSID, including its offset, size, and SID value.
     """
 
-    def __init__(self, value, verbose=False):
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.verbose = verbose
         self.value = value
+        self.ldap_searcher = ldap_searcher
+        self.displayName = None
         #
         self.bytesize = 0
         #
@@ -736,17 +887,36 @@ class GroupSID(object):
         self.sid = SID.fromRawBytes(self.value)
         self.bytesize = self.sid.bytesize
 
+        # Resolve display Name
+        __sid_str_repr = self.sid.toString()
+        if __sid_str_repr in self.sid.wellKnownSIDs.keys():
+            self.displayName = self.sid.wellKnownSIDs[__sid_str_repr]
+        
+        # Try to resolve it from the LDAP
+        if self.displayName is None:
+            if self.ldap_searcher is not None:
+                search_base = ldap_server.info.other["defaultNamingContext"][0]
+                __ldap_results = self.ldap_searcher.query(
+                    base_dn=search_base,
+                    query="(objectSid=%s)" % self.sid.toString(),
+                    attributes=["sAMAccountName"]
+                )
+                if len(__ldap_results.keys()) != 0:
+                    __dn = list(__ldap_results.keys())[0]
+                    __dc_string = "DC=" + __dn.split(',DC=',1)[1]
+                    __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
+                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn]["sAMAccountName"])
+
         if self.verbose:
             self.describe()
 
     def describe(self, offset=0, indent=0):
         indent_prompt = "  │ " * indent
         print("%s<GroupSID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        str_repr = self.sid.toString()
-        if str_repr not in self.sid.wellKnownSIDs.keys():
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, str_repr))
+        if self.displayName is not None:
+            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
         else:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, str_repr, self.sid.wellKnownSIDs[str_repr]))
+            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
         print(''.join(["  │ "]*indent + ["  └─"]))
 
 
@@ -765,9 +935,11 @@ class ACESID(object):
         describe(offset=0, indent=0): Prints a formatted description of the ACESID, including its offset, size, and SID value.
     """
 
-    def __init__(self, value, verbose=False):
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.verbose = verbose
         self.value = value
+        self.ldap_searcher = ldap_searcher
+        self.displayName = None
         #
         self.bytesize = 0
         #
@@ -783,17 +955,37 @@ class ACESID(object):
         self.sid = SID.fromRawBytes(self.value)
         self.bytesize = self.sid.bytesize
 
+        # Resolve display Name
+        __sid_str_repr = self.sid.toString()
+        if __sid_str_repr in self.sid.wellKnownSIDs.keys():
+            self.displayName = self.sid.wellKnownSIDs[__sid_str_repr]
+        
+        # Try to resolve it from the LDAP
+        if self.displayName is None:
+            if self.ldap_searcher is not None:
+                search_base = ldap_server.info.other["defaultNamingContext"][0]
+                __ldap_results = self.ldap_searcher.query(
+                    base_dn=search_base,
+                    query="(objectSid=%s)" % self.sid.toString(),
+                    attributes=["sAMAccountName"]
+                )
+                if len(__ldap_results.keys()) != 0:
+                    __dn = list(__ldap_results.keys())[0]
+                    __dc_string = "DC=" + __dn.split(',DC=',1)[1]
+                    __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
+                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn]["sAMAccountName"])
+
+        # 
         if self.verbose:
             self.describe()
 
     def describe(self, offset=0, indent=0):
         indent_prompt = "  │ " * indent
         print("%s<ACESID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        str_repr = self.sid.toString()
-        if str_repr not in self.sid.wellKnownSIDs.keys():
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, str_repr))
+        if self.displayName is not None:
+            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
         else:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, str_repr, self.sid.wellKnownSIDs[str_repr]))
+            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
         print(''.join(["  │ "]*indent + ["  └─"]))  
 
 ## ACE
@@ -1148,9 +1340,10 @@ class AccessControlEntry_Header(object):
 
 
 class AccessControlEntry(object):
-    def __init__(self, value, verbose=False):
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.verbose = verbose
         self.value = value
+        self.ldap_searcher = ldap_searcher
         #
         self.bytesize = 0
         self.header = None
@@ -1179,7 +1372,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
             
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
             
@@ -1193,7 +1386,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
             
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1211,7 +1404,7 @@ class AccessControlEntry(object):
             # matches the Sid field causes the system to generate an audit message. If an application
             # does not specify a SID for this field, audit messages are generated for the specified
             # access rights for all trustees.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1267,7 +1460,7 @@ class AccessControlEntry(object):
             self.bytesize += self.object_type.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1305,7 +1498,7 @@ class AccessControlEntry(object):
             self.bytesize += self.object_type.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1370,7 +1563,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1388,7 +1581,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1430,7 +1623,7 @@ class AccessControlEntry(object):
             self.bytesize += self.object_type.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1472,7 +1665,7 @@ class AccessControlEntry(object):
             self.bytesize += self.object_type.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1490,7 +1683,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1541,7 +1734,7 @@ class AccessControlEntry(object):
             self.bytesize += self.object_type.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1568,7 +1761,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
             
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1582,7 +1775,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1600,7 +1793,7 @@ class AccessControlEntry(object):
             self.bytesize += self.mask.bytesize
 
             # Sid (variable): The SID of a trustee. The length of the SID MUST be a multiple of 4.
-            self.ace_sid = ACESID(value=self.value, verbose=self.verbose)
+            self.ace_sid = ACESID(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.ace_sid.bytesize:]
             self.bytesize += self.ace_sid.bytesize
 
@@ -1714,7 +1907,7 @@ class SystemAccessControlList_Header(object):
 
 
 class SystemAccessControlList(object):
-    def __init__(self, value, verbose=False):
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.verbose = verbose
         self.value = value
         #
@@ -1722,6 +1915,7 @@ class SystemAccessControlList(object):
         #
         self.header = None
         self.entries = []
+        self.ldap_searcher = ldap_searcher
         #
         self.parse()
 
@@ -1736,7 +1930,7 @@ class SystemAccessControlList(object):
         # Parsing ACE entries
         self.entries = []
         for k in range(self.header["AceCount"]):
-            ace = AccessControlEntry(value=self.value)
+            ace = AccessControlEntry(value=self.value, verbose=self.verbose, ldap_searcher=self.ldap_searcher)
             self.entries.append(ace)
 
             self.bytesize += ace.bytesize
@@ -1849,7 +2043,7 @@ class DiscretionaryAccessControlList_Header(object):
 
 
 class DiscretionaryAccessControlList(object):
-    def __init__(self, value, verbose=False):
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.verbose = verbose
         self.value = value
         #
@@ -1857,6 +2051,7 @@ class DiscretionaryAccessControlList(object):
         #
         self.header = None
         self.entries = []
+        self.ldap_searcher = ldap_searcher
         #
         self.parse()
 
@@ -1871,7 +2066,7 @@ class DiscretionaryAccessControlList(object):
         # Parsing ACE entries
         self.entries = []
         for k in range(self.header["AceCount"]):
-            ace = AccessControlEntry(value=self.value, verbose=self.verbose)
+            ace = AccessControlEntry(value=self.value, verbose=self.verbose, ldap_searcher=self.ldap_searcher)
             self.entries.append(ace)
 
             self.bytesize += ace.bytesize
@@ -1990,7 +2185,7 @@ class NTSecurityDescriptor_Header(object):
 
 
 class NTSecurityDescriptor(object):
-    def __init__(self, value, verbose=False):
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.value = value
         # Properties of this section
         self.header = None
@@ -1999,6 +2194,7 @@ class NTSecurityDescriptor(object):
         self.owner = None
         self.group = None
         self.verbose = verbose
+        self.ldap_searcher = ldap_searcher
         # 
         self.parse()
 
@@ -2014,7 +2210,8 @@ class NTSecurityDescriptor(object):
         else:
             self.owner = OwnerSID(
                 value=self.value[self.header.OffsetOwner-self.header.bytesize:], 
-                verbose=self.verbose
+                verbose=self.verbose,
+                ldap_searcher=self.ldap_searcher
             )
 
         # Parse GroupSID if present
@@ -2023,7 +2220,8 @@ class NTSecurityDescriptor(object):
         else:
             self.group = GroupSID(
                 value=self.value[self.header.OffsetGroup-self.header.bytesize:], 
-                verbose=self.verbose
+                verbose=self.verbose,
+                ldap_searcher=self.ldap_searcher
             )
 
         # Parse DACL if present
@@ -2032,7 +2230,8 @@ class NTSecurityDescriptor(object):
         else:
             self.dacl = DiscretionaryAccessControlList(
                 value=self.value[self.header.OffsetDacl-self.header.bytesize:], 
-                verbose=self.verbose
+                verbose=self.verbose,
+                ldap_searcher=self.ldap_searcher
             )
         
         # Parse SACL if present
@@ -2041,7 +2240,8 @@ class NTSecurityDescriptor(object):
         else:
             self.sacl = SystemAccessControlList(
                 value=self.value[self.header.OffsetSacl-self.header.bytesize:], 
-                verbose=self.verbose
+                verbose=self.verbose,
+                ldap_searcher=self.ldap_searcher
             )
 
         if self.verbose:
@@ -2085,9 +2285,26 @@ def parseArgs():
 
     parser = argparse.ArgumentParser(add_help=True, description="Parse and describe the contents of a raw ntSecurityDescriptor structure")
 
-    parser.add_argument("-v", "--verbose", default=False, action="store_true", help="Verbose mode. (default: False)")
+    parser.add_argument("-V", "--verbose", default=False, action="store_true", help="Verbose mode. (default: False)")
 
-    parser.add_argument("value", type=str, help="The value to be described by the NTSecurityDescriptor")
+    parser.add_argument("-v", "--value", type=str, help="The value to be described by the NTSecurityDescriptor")
+
+    parser.add_argument('--use-ldaps', action='store_true', help='Use LDAPS instead of LDAP')
+    
+    authconn = parser.add_argument_group('authentication & connection')
+    authconn.add_argument('--dc-ip', action='store', metavar="ip address", help='IP Address of the domain controller or KDC (Key Distribution Center) for Kerberos. If omitted it will use the domain part (FQDN) specified in the identity parameter')
+    authconn.add_argument('--kdcHost', dest="kdcHost", action='store', metavar="FQDN KDC", help='FQDN of KDC for Kerberos.')
+    authconn.add_argument("-d", "--domain", dest="auth_domain", metavar="DOMAIN", action="store", help="(FQDN) domain to authenticate to")
+    authconn.add_argument("-u", "--user", dest="auth_username", metavar="USER", action="store", help="user to authenticate with")
+
+    secret = parser.add_argument_group()
+    cred = secret.add_mutually_exclusive_group()
+    cred.add_argument('--no-pass', action="store_true", help='don\'t ask for password (useful for -k)')
+    cred.add_argument("-p", "--password", dest="auth_password", metavar="PASSWORD", action="store", help="password to authenticate with")
+    cred.add_argument("-H", "--hashes", dest="auth_hashes", action="store", metavar="[LMHASH:]NTHASH", help='NT/LM hashes, format is LMhash:NThash')
+    cred.add_argument('--aes-key', dest="auth_key", action="store", metavar="hex key", help='AES key to use for Kerberos Authentication (128 or 256 bits)')
+    secret.add_argument("-k", "--kerberos", dest="use_kerberos", action="store_true", help='Use Kerberos authentication. Grabs credentials from .ccache file (KRB5CCNAME) based on target parameters. If valid credentials cannot be found, it will use the ones specified in the command line')
+
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -2099,19 +2316,57 @@ def parseArgs():
 if __name__ == "__main__":
     options = parseArgs()
 
+    ls = None
+    if options.auth_username is not None:
+        # Parse hashes
+        auth_lm_hash = ""
+        auth_nt_hash = ""
+        if options.auth_hashes is not None:
+            if ":" in options.auth_hashes:
+                auth_lm_hash = options.auth_hashes.split(":")[0]
+                auth_nt_hash = options.auth_hashes.split(":")[1]
+            else:
+                auth_nt_hash = options.auth_hashes
+        
+        # Use AES Authentication key if available
+        if options.auth_key is not None:
+            options.use_kerberos = True
+        if options.use_kerberos is True and options.kdcHost is None:
+            print("[!] Specify KDC's Hostname of FQDN using the argument --kdcHost")
+            exit()
+
+        # Try to authenticate with specified credentials
+        print("[>] Try to authenticate as '%s\\%s' on %s ... " % (options.auth_domain, options.auth_username, options.dc_ip))
+        ldap_server, ldap_session = init_ldap_session(
+            auth_domain=options.auth_domain,
+            auth_dc_ip=options.dc_ip,
+            auth_username=options.auth_username,
+            auth_password=options.auth_password,
+            auth_lm_hash=auth_lm_hash,
+            auth_nt_hash=auth_nt_hash,
+            auth_key=options.auth_key,
+            use_kerberos=options.use_kerberos,
+            kdcHost=options.kdcHost,
+            use_ldaps=options.use_ldaps
+        )
+        print("[+] Authentication successful!\n")
+        ls = LDAPSearcher(
+            ldap_server=ldap_server,
+            ldap_session=ldap_session
+        )
+
     if os.path.isfile(options.value):
         print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
         filename = options.value
         options.value = open(filename, 'r').read().strip()
-    
     if re.compile(r'^[0-9a-fA-F]+$').match(options.value):
         options.value = binascii.unhexlify(options.value)
 
     ntsd = NTSecurityDescriptor(
         value=options.value, 
-        verbose=options.verbose
+        verbose=options.verbose,
+        ldap_searcher=ls
     )
-
     if options.verbose:
         print("[>] Final result " + "".center(80,"="))
 
