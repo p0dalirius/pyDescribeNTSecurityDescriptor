@@ -28,7 +28,7 @@
   - [x] ACE type [`SYSTEM_RESOURCE_ATTRIBUTE_ACE`](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/352944c7-4fb6-4988-8036-0a25dcedc730?wt.mc_id=SEC-MVP-5005286)
   - [x] ACE type [`SYSTEM_SCOPED_POLICY_ID_ACE`](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/aa0c0f62-4b4c-44f0-9718-c266a6accd9f?wt.mc_id=SEC-MVP-5005286)
 - [x] Parse SID
-  - [ ] Connect to LDAP to resolve sAMAccountNames of not well known SIDs
+  - [x] Connect to LDAP to resolve sAMAccountNames of not well known SIDs
   - [x] Resolve names of well known SIDs
 
 ## Demonstration
