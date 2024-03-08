@@ -1061,22 +1061,32 @@ class AccessControlObjectType(object):
 
     def describe(self, offset=0, indent=0):
         indent_prompt = " │ " * indent
-        print("%s<AccessControlObjectType at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        print("%s │ \x1b[93mFlags\x1b[0m                   : \x1b[96m0x%08x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.flags.value, self.flags.name))
+
+        properties = []
+        properties.append("Flags")
+        if self.ObjectTypeGuid is not None:
+            properties.append("ObjectTypeGuid")
+        if self.InheritedObjectTypeGuid is not None:
+            properties.append("InheritedObjectTypeGuid")
+        padding_len = max([len(p) for p in properties])
+
+        print("%s<AccessControlObjectType at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))       
+       
+        print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m0x%08x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "Flags".ljust(padding_len), self.flags.value, self.flags.name))
         
         if self.ObjectTypeGuid is not None:
             guid_format_d = self.ObjectTypeGuid.toFormatD()
             if guid_format_d in [er.value for er in ExtendedRights]:
-                print("%s │ \x1b[93mObjectTypeGuid\x1b[0m          : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, guid_format_d, ExtendedRights(guid_format_d).name))
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), guid_format_d, ExtendedRights(guid_format_d).name))
             else:
-                print("%s │ \x1b[93mObjectTypeGuid\x1b[0m          : \x1b[96m%s\x1b[0m" % (indent_prompt, guid_format_d))
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), guid_format_d))
         
         if self.InheritedObjectTypeGuid is not None:
             guid_format_d = self.InheritedObjectTypeGuid.toFormatD()
             if guid_format_d in [er.value for er in ExtendedRights]:
-                print("%s │ \x1b[93mInheritedObjectTypeGuid\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, guid_format_d, ExtendedRights(guid_format_d).name))
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), guid_format_d, ExtendedRights(guid_format_d).name))
             else:
-                print("%s │ \x1b[93mInheritedObjectTypeGuid\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, guid_format_d))
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), guid_format_d))
         
         print(''.join([" │ "]*indent + [" └─"]))
 
