@@ -516,14 +516,14 @@ class SID(object):
             return "<SID '%s' (%s)>" % (str_repr, self.wellKnownSIDs[str_repr])
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<SID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
         str_repr = self.toString()
         if str_repr not in self.wellKnownSIDs.keys():
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, str_repr))
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, str_repr))
         else:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, str_repr, self.wellKnownSIDs[str_repr]))
-        print(''.join(["  │ "]*indent + ["  └─"]))    
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, str_repr, self.wellKnownSIDs[str_repr]))
+        print(''.join([" │ "]*indent + [" └─"]))    
 
 # Aliases
 
@@ -842,14 +842,14 @@ class OwnerSID(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<OwnerSID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
         str_repr = self.sid.toString()
         if self.displayName is not None:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
         else:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
-        print(''.join(["  │ "]*indent + ["  └─"]))
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
+        print(''.join([" │ "]*indent + [" └─"]))
 
 
 class GroupSID(object):
@@ -911,13 +911,13 @@ class GroupSID(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<GroupSID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
         if self.displayName is not None:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
         else:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
-        print(''.join(["  │ "]*indent + ["  └─"]))
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
+        print(''.join([" │ "]*indent + [" └─"]))
 
 
 class ACESID(object):
@@ -980,13 +980,13 @@ class ACESID(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<ACESID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
         if self.displayName is not None:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
         else:
-            print("%s  │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
-        print(''.join(["  │ "]*indent + ["  └─"]))  
+            print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, self.sid.toString()))
+        print(''.join([" │ "]*indent + [" └─"]))  
 
 ## ACE
 
@@ -1060,25 +1060,25 @@ class AccessControlObjectType(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<AccessControlObjectType at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        print("%s  │ \x1b[93mFlags\x1b[0m : \x1b[96m0x%08x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.flags.value, self.flags.name))
+        print("%s │ \x1b[93mFlags\x1b[0m                   : \x1b[96m0x%08x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.flags.value, self.flags.name))
         
         if self.ObjectTypeGuid is not None:
             guid_format_d = self.ObjectTypeGuid.toFormatD()
             if guid_format_d in [er.value for er in ExtendedRights]:
-                print("%s  │ \x1b[93mObjectTypeGuid\x1b[0m  : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, guid_format_d, ExtendedRights(guid_format_d).name))
+                print("%s │ \x1b[93mObjectTypeGuid\x1b[0m          : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, guid_format_d, ExtendedRights(guid_format_d).name))
             else:
-                print("%s  │ \x1b[93mObjectTypeGuid\x1b[0m  : \x1b[96m%s\x1b[0m" % (indent_prompt, guid_format_d))
+                print("%s │ \x1b[93mObjectTypeGuid\x1b[0m          : \x1b[96m%s\x1b[0m" % (indent_prompt, guid_format_d))
         
         if self.InheritedObjectTypeGuid is not None:
             guid_format_d = self.InheritedObjectTypeGuid.toFormatD()
             if guid_format_d in [er.value for er in ExtendedRights]:
-                print("%s  │ \x1b[93mInheritedObjectTypeGuid\x1b[0m  : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, guid_format_d, ExtendedRights(guid_format_d).name))
+                print("%s │ \x1b[93mInheritedObjectTypeGuid\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, guid_format_d, ExtendedRights(guid_format_d).name))
             else:
-                print("%s  │ \x1b[93mInheritedObjectTypeGuid\x1b[0m  : \x1b[96m%s\x1b[0m" % (indent_prompt, guid_format_d))
+                print("%s │ \x1b[93mInheritedObjectTypeGuid\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, guid_format_d))
         
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.__data[key]
@@ -1191,15 +1191,15 @@ class AccessControlMask(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<AccessControlMask at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        print("%s  │ \x1b[93mAccessMask\x1b[0m : \x1b[96m0x%08x\x1b[0m (\x1b[94m%s\x1b[0m)" % (
+        print("%s │ \x1b[93mAccessMask\x1b[0m : \x1b[96m0x%08x\x1b[0m (\x1b[94m%s\x1b[0m)" % (
                 indent_prompt,
                 self.__data["AccessMask"].value,
                 self.__data["AccessMask"].name
             )
         )
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.__data[key]
@@ -1325,12 +1325,12 @@ class AccessControlEntry_Header(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<AccessControlEntry_Header at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        print("%s  │ \x1b[93mAceType\x1b[0m  : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.__data["AceType"].value, self.__data["AceType"].name))
-        print("%s  │ \x1b[93mAceFlags\x1b[0m : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.__data["AceFlags"].value, self.__data["AceFlags"].name))
-        print("%s  │ \x1b[93mAceSize\x1b[0m  : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AceSize"]))
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print("%s │ \x1b[93mAceType\x1b[0m  : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.__data["AceType"].value, self.__data["AceType"].name))
+        print("%s │ \x1b[93mAceFlags\x1b[0m : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.__data["AceFlags"].value, self.__data["AceFlags"].name))
+        print("%s │ \x1b[93mAceSize\x1b[0m  : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AceSize"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.__data[key]
@@ -1805,7 +1805,7 @@ class AccessControlEntry(object):
             self.describe()
 
     def describe(self, ace_number=0, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<AccessControlEntry #%d at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, ace_number, offset, self.bytesize))
         self.header.describe(offset=offset, indent=(indent + 1))
         offset += self.header.bytesize
@@ -1819,7 +1819,7 @@ class AccessControlEntry(object):
         if self.ace_sid is not None:
             self.ace_sid.describe(offset=offset, indent=(indent + 1))
 
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
 ## ACL
 
@@ -1887,14 +1887,14 @@ class SystemAccessControlList_Header(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<SystemAccessControlList_Header at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        print("%s  │ \x1b[93mRevision\x1b[0m : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.Revision.value, self.Revision.name))
-        print("%s  │ \x1b[93mSbz1\x1b[0m     : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Sbz1"]))
-        print("%s  │ \x1b[93mAclSize\x1b[0m  : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AclSize"]))
-        print("%s  │ \x1b[93mAceCount\x1b[0m : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AceCount"]))
-        print("%s  │ \x1b[93mSbz2\x1b[0m     : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["Sbz2"]))
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print("%s │ \x1b[93mRevision\x1b[0m : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.Revision.value, self.Revision.name))
+        print("%s │ \x1b[93mSbz1\x1b[0m     : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Sbz1"]))
+        print("%s │ \x1b[93mAclSize\x1b[0m  : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AclSize"]))
+        print("%s │ \x1b[93mAceCount\x1b[0m : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AceCount"]))
+        print("%s │ \x1b[93mSbz2\x1b[0m     : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["Sbz2"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.__data[key]
@@ -1940,7 +1940,7 @@ class SystemAccessControlList(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<SystemAccessControlList at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
         self.header.describe(offset=offset, indent=(indent + 1))
         offset += self.header.bytesize
@@ -1949,7 +1949,7 @@ class SystemAccessControlList(object):
             ace_number += 1
             ace.describe(ace_number=ace_number, offset=offset, indent=(indent + 1))
             offset += ace.bytesize
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.entries[key]
@@ -2023,14 +2023,14 @@ class DiscretionaryAccessControlList_Header(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<DiscretionaryAccessControlList_Header at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        print("%s  │ \x1b[93mRevision\x1b[0m : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.Revision.value, self.Revision.name))
-        print("%s  │ \x1b[93mSbz1\x1b[0m     : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Sbz1"]))
-        print("%s  │ \x1b[93mAclSize\x1b[0m  : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AclSize"]))
-        print("%s  │ \x1b[93mAceCount\x1b[0m : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AceCount"]))
-        print("%s  │ \x1b[93mSbz2\x1b[0m     : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["Sbz2"]))
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print("%s │ \x1b[93mRevision\x1b[0m : \x1b[96m0x%02x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.Revision.value, self.Revision.name))
+        print("%s │ \x1b[93mSbz1\x1b[0m     : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Sbz1"]))
+        print("%s │ \x1b[93mAclSize\x1b[0m  : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AclSize"]))
+        print("%s │ \x1b[93mAceCount\x1b[0m : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["AceCount"]))
+        print("%s │ \x1b[93mSbz2\x1b[0m     : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["Sbz2"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.__data[key]
@@ -2076,7 +2076,7 @@ class DiscretionaryAccessControlList(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<DiscretionaryAccessControlList at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
         self.header.describe(offset=offset, indent=(indent + 1))
         offset += self.header.bytesize
@@ -2085,7 +2085,7 @@ class DiscretionaryAccessControlList(object):
             ace_number += 1
             ace.describe(ace_number=ace_number, offset=offset, indent=(indent + 1))
             offset += ace.bytesize
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.entries[key]
@@ -2163,16 +2163,16 @@ class NTSecurityDescriptor_Header(object):
             self.describe()
 
     def describe(self, offset=0, indent=0):
-        indent_prompt = "  │ " * indent
+        indent_prompt = " │ " * indent
         print("%s<NTSecurityDescriptor_Header at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        print("%s  │ \x1b[93mRevision\x1b[0m    : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Revision"]))
-        print("%s  │ \x1b[93mSbz1\x1b[0m        : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Sbz1"]))
-        print("%s  │ \x1b[93mControl\x1b[0m     : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["Control"]))
-        print("%s  │ \x1b[93mOffsetOwner\x1b[0m : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetOwner"]))
-        print("%s  │ \x1b[93mOffsetGroup\x1b[0m : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetGroup"]))
-        print("%s  │ \x1b[93mOffsetSacl\x1b[0m  : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetSacl"]))
-        print("%s  │ \x1b[93mOffsetDacl\x1b[0m  : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetDacl"]))
-        print(''.join(["  │ "]*indent + ["  └─"]))
+        print("%s │ \x1b[93mRevision\x1b[0m    : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Revision"]))
+        print("%s │ \x1b[93mSbz1\x1b[0m        : \x1b[96m0x%02x\x1b[0m" % (indent_prompt, self.__data["Sbz1"]))
+        print("%s │ \x1b[93mControl\x1b[0m     : \x1b[96m0x%04x\x1b[0m" % (indent_prompt, self.__data["Control"]))
+        print("%s │ \x1b[93mOffsetOwner\x1b[0m : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetOwner"]))
+        print("%s │ \x1b[93mOffsetGroup\x1b[0m : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetGroup"]))
+        print("%s │ \x1b[93mOffsetSacl\x1b[0m  : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetSacl"]))
+        print("%s │ \x1b[93mOffsetDacl\x1b[0m  : \x1b[96m0x%08x\x1b[0m" % (indent_prompt, self.__data["OffsetDacl"]))
+        print(''.join([" │ "]*indent + [" └─"]))
 
     def __getitem__(self, key):
         return self.__data[key]
@@ -2256,28 +2256,28 @@ class NTSecurityDescriptor(object):
             if self.dacl is not None:
                 self.dacl.describe(offset=self.header.OffsetDacl, indent=indent+1)
             else:
-                print("%s<DiscretionaryAccessControlList is \x1b[91mnot present\x1b[0m>" % ("  │ " * (indent+1)))
-                print("%s  └─" % ("  │ " * (indent+1)))
+                print("%s<DiscretionaryAccessControlList is \x1b[91mnot present\x1b[0m>" % (" │ " * (indent+1)))
+                print("%s └─" % (" │ " * (indent+1)))
             # Print SACL
             if self.sacl is not None:
                 self.sacl.describe(offset=self.header.OffsetSacl, indent=indent+1)
             else:
-                print("%s<SystemAccessControlList is \x1b[91mnot present\x1b[0m>" % ("  │ " * (indent+1)))
-                print("%s  └─" % ("  │ " * (indent+1)))
+                print("%s<SystemAccessControlList is \x1b[91mnot present\x1b[0m>" % (" │ " * (indent+1)))
+                print("%s └─" % (" │ " * (indent+1)))
         else:
             # Print SACL
             if self.sacl is not None:
                 self.sacl.describe(offset=self.header.OffsetSacl, indent=indent+1)
             else:
-                print("%s<SystemAccessControlList is \x1b[91mnot present\x1b[0m>" % ("  │ " * (indent+1)))
-                print("%s  └─" % ("  │ " * (indent+1)))
+                print("%s<SystemAccessControlList is \x1b[91mnot present\x1b[0m>" % (" │ " * (indent+1)))
+                print("%s └─" % (" │ " * (indent+1)))
             # Print DACL
             if self.dacl is not None:
                 self.dacl.describe(offset=self.header.OffsetDacl, indent=indent+1)
             else:
-                print("%s<DiscretionaryAccessControlList is \x1b[91mnot present\x1b[0m>" % ("  │ " * (indent+1)))
-                print("%s  └─" % ("  │ " * (indent+1)))
-        print("  └─")
+                print("%s<DiscretionaryAccessControlList is \x1b[91mnot present\x1b[0m>" % (" │ " * (indent+1)))
+                print("%s └─" % (" │ " * (indent+1)))
+        print(" └─")
 
 
 def parseArgs():
