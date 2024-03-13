@@ -1092,7 +1092,9 @@ class AccessControlObjectType(object):
         #
         self.bytesize = 0
         self.ObjectTypeGuid = None
+        self.ObjectTypeGuid_text = None
         self.InheritedObjectTypeGuid = None
+        self.InheritedObjectTypeGuid_text = None
         self.flags = 0
         #
         self.parse()
@@ -1112,16 +1114,45 @@ class AccessControlObjectType(object):
         if (self.flags & AccessControlObjectTypeFlags.ACE_OBJECT_TYPE_PRESENT) and (self.flags & AccessControlObjectTypeFlags.ACE_INHERITED_OBJECT_TYPE_PRESENT):
             self.bytesize += 16
             self.ObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
+            if self.ObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
+                self.ObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.ObjectTypeGuid.toFormatD()).name
+            elif self.ObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
+                self.ObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.ObjectTypeGuid.toFormatD()).name
+            elif self.ldap_searcher is not None:
+                if self.ObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
+                    self.ObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.ObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
+
             self.bytesize += 16
             self.InheritedObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
+            if self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
+                self.InheritedObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.InheritedObjectTypeGuid.toFormatD()).name
+            elif self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
+                self.InheritedObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.InheritedObjectTypeGuid.toFormatD()).name
+            elif self.ldap_searcher is not None:
+                if self.InheritedObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
+                    self.InheritedObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.InheritedObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
 
         elif (self.flags & AccessControlObjectTypeFlags.ACE_OBJECT_TYPE_PRESENT):
             self.bytesize += 16
             self.ObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
-        
+            if self.ObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
+                self.ObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.ObjectTypeGuid.toFormatD()).name
+            elif self.ObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
+                self.ObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.ObjectTypeGuid.toFormatD()).name
+            elif self.ldap_searcher is not None:
+                if self.ObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
+                    self.ObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.ObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
+
         elif (self.flags & AccessControlObjectTypeFlags.ACE_INHERITED_OBJECT_TYPE_PRESENT):
             self.bytesize += 16
             self.InheritedObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
+            if self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
+                self.InheritedObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.InheritedObjectTypeGuid.toFormatD()).name
+            elif self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
+                self.InheritedObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.InheritedObjectTypeGuid.toFormatD()).name
+            elif self.ldap_searcher is not None:
+                if self.InheritedObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
+                    self.InheritedObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.InheritedObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
 
         if self.verbose:
             self.describe()
@@ -1142,36 +1173,16 @@ class AccessControlObjectType(object):
         print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m0x%08x\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "Flags".ljust(padding_len), self.flags.value, self.flags.name))
         
         if self.ObjectTypeGuid is not None:
-            guid_format_d = self.ObjectTypeGuid.toFormatD()
-            guid_name = None
-            if guid_format_d in [_.value for _ in ExtendedRights]:
-                guid_name = "ExtendedRight: %s" % ExtendedRights(guid_format_d).name
-            elif guid_format_d in [_.value for _ in PropertySet]:
-                guid_name = "PropertySet: %s" % PropertySet(guid_format_d).name
-            elif self.ldap_searcher is not None:
-                if guid_format_d in self.ldap_searcher.schemaIDGUID.keys():
-                    guid_name = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[guid_format_d]["ldapDisplayName"]
-
-            if guid_name is not None:
-                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), guid_format_d, guid_name))
+            if self.ObjectTypeGuid_text is not None:
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), self.ObjectTypeGuid.toFormatD(), self.ObjectTypeGuid_text))
             else:
-                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), guid_format_d))
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), self.ObjectTypeGuid.toFormatD()))
         
         if self.InheritedObjectTypeGuid is not None:
-            guid_format_d = self.InheritedObjectTypeGuid.toFormatD()
-            guid_name = None
-            if guid_format_d in [_.value for _ in ExtendedRights]:
-                guid_name = "ExtendedRight: %s" % ExtendedRights(guid_format_d).name
-            elif guid_format_d in [_.value for _ in PropertySet]:
-                guid_name = "PropertySet: %s" % PropertySet(guid_format_d).name
-            elif self.ldap_searcher is not None:
-                if guid_format_d in self.ldap_searcher.schemaIDGUID.keys():
-                    guid_name = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[guid_format_d]["ldapDisplayName"]
-
-            if guid_name is not None:
-                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), guid_format_d, guid_name))
+            if self.InheritedObjectTypeGuid_text is not None:
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), self.InheritedObjectTypeGuid.toFormatD(), self.InheritedObjectTypeGuid_text))
             else:
-                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), guid_format_d))
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), self.InheritedObjectTypeGuid.toFormatD()))
         
         print(''.join([" │ "]*indent + [" └─"]))
 
@@ -2375,6 +2386,80 @@ class NTSecurityDescriptor(object):
         print(" └─")
 
 
+class HumanDescriber(object):
+    def __init__(self, ntsd, verbose=False):
+        self.verbose = verbose
+        self.ntsd = ntsd
+
+    def summary(self):
+        print("Other objects have the following rights on this object:")
+
+        # Iterate on DACL entries
+        entry_id = 0
+        for ace in self.ntsd.dacl.entries:
+            entry_id += 1
+            self.explain_ace(ace=ace, entry_id=entry_id)
+
+    def explain_ace(self, ace, entry_id=0):
+        # Checking allowed rights
+        if ace.header.AceType in [
+            AccessControlEntry_Type.ACCESS_ALLOWED_ACE_TYPE, 
+            AccessControlEntry_Type.ACCESS_ALLOWED_OBJECT_ACE_TYPE
+        ]:
+            if ace.ace_sid is not None:
+                if ace.ace_sid.displayName is not None:
+                    identityDisplayName = ace.ace_sid.displayName
+                else:
+                    identityDisplayName = ace.ace_sid.sid
+
+                # Parse rights
+                str_rights = self.explain_access_mask(ace=ace)
+
+                # Parse target
+                str_target = "me"
+                if ace.object_type is not None:
+                    if ace.object_type.ObjectTypeGuid_text is not None:
+                        str_target = "my " + ace.object_type.ObjectTypeGuid_text
+                    elif ace.object_type.ObjectTypeGuid is not None:
+                        str_target = ace.object_type.ObjectTypeGuid.toFormatD()
+                else:
+                    str_target = "me"
+
+                # Check inheritance
+                if (ace.header.AceFlags & AccessControlEntry_Flags.INHERITED_ACE):
+                    print("%03d. '\x1b[94m%s\x1b[0m' is \x1b[92mallowed\x1b[0m to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m" % (entry_id, identityDisplayName, str_rights, str_target))
+                else:
+                    print("%03d. '\x1b[94m%s\x1b[0m' is \x1b[92mallowed\x1b[0m to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m, by inheritance." % (entry_id, identityDisplayName, str_rights, str_target))
+            else:
+                print("%d. UNHANDLED" % (entry_id))
+
+    def explain_access_mask(self, ace):
+        mapping = {
+            "DS_CREATE_CHILD": "Create Child",
+            "DS_DELETE_CHILD": "Delete Child",
+            "DS_LIST_CONTENTS": "List Contents",
+            "DS_WRITE_PROPERTY_EXTENDED": "Write Extended Properties",
+            "DS_READ_PROPERTY": "Read",
+            "DS_WRITE_PROPERTY": "Write",
+            "DS_DELETE_TREE": "Delete Tree",
+            "DS_LIST_OBJECT": "List Object",
+            "DS_CONTROL_ACCESS": "Control Access",
+            "DELETE": "Delete",
+            "READ_CONTROL": "Read Control",
+            "WRITE_DAC": "Write Dac",
+            "WRITE_OWNER": "Write Owner",
+            "GENERIC_ALL": "Generic All",
+            "GENERIC_EXECUTE": "Generic Execute",
+            "GENERIC_WRITE": "Generic Write",
+            "GENERIC_READ": "Generic Read"
+        }
+        rights = []
+        for flag in AccessMaskFlags(ace.mask.AccessMask):
+            rights.append(mapping[flag.name])
+        
+        return "%s" % ', '.join(rights)
+
+
 def parseArgs():
     print("DescribeNTSecurityDescriptor.py v%s - by @podalirius_\n" % VERSION)
 
@@ -2385,7 +2470,9 @@ def parseArgs():
     parser.add_argument("-v", "--value", type=str, help="The value to be described by the NTSecurityDescriptor")
     
     parser.add_argument("--use-ldaps", action="store_true", default=False, help="Use LDAPS instead of LDAP")
+
     parser.add_argument("--summary", action="store_true", default=False, help="Generate a human readable summary of the rights.")
+    parser.add_argument("--describe", action="store_true", default=False, help="Describe the raw structure.")
 
     authconn = parser.add_argument_group("authentication & connection")
     authconn.add_argument("--dc-ip", action="store", metavar="ip address", help="IP Address of the domain controller or KDC (Key Distribution Center) for Kerberos. If omitted it will use the domain part (FQDN) specified in the identity parameter")
@@ -2404,9 +2491,14 @@ def parseArgs():
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
-        
+    
     options = parser.parse_args()
     
+    if options.summary == False and options.describe == False:
+        parser.print_help()
+        print("\n[+] At least one option of --summary and/or --describe is needed.\n")
+        sys.exit(1)
+
     if options.auth_password is None and options.no_pass == False and options.auth_hashes is None:
         print("[+] No password of hashes provided and --no-pass is '%s'" % options.no_pass)
         from getpass import getpass
@@ -2476,8 +2568,9 @@ if __name__ == "__main__":
     if options.verbose:
         print("[>] Final result " + "".center(80,"="))
 
-    ntsd.describe()
+    if options.describe or options.verbose:
+        ntsd.describe()
 
-    if options.summary:
-        print("==[Summary]".ljust(80,'='))
-        # TODO
+    if options.summary or options.verbose:
+        print("\n" + "==[Summary]".ljust(80,'=') + "\n")
+        HumanDescriber(ntsd=ntsd).summary()
