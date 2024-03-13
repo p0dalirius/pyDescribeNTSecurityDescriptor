@@ -11,6 +11,8 @@
 
 ## Features
 
+- [x] Reads source value from a file or from the LDAP
+- [x] Outputs a human readable summary of accesses with `--summary`
 - [x] Parse Access Control Entries (ACE) of various types:
   - [x] ACE type [`ACCESS_ALLOWED_ACE`](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/72e7c7ea-bc02-4c74-a619-818a16bf6adb?wt.mc_id=SEC-MVP-5005286)
   - [x] ACE type [`ACCESS_ALLOWED_OBJECT_ACE`](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/c79a383c-2b3f-4655-abe7-dcbb7ce0cfbe?wt.mc_id=SEC-MVP-5005286)
@@ -41,7 +43,7 @@ Here is an example of the output of the tool when parsing the ntSecurityDescript
 02000000000005200000002a02000000121800bd010f0001020000000000052000000020020000010500000000000515000000a3cd06bf0e0fe808c335b8e600020000010500000000000515000000a3cd06bf0e0fe808c335b8e600020000
 ```
 
-Using [DescribeNTSecurityDescriptor.py](./DescribeNTSecurityDescriptor.py), we can open the file and parse its content precisely: 
+Using [DescribeNTSecurityDescriptor.py](./DescribeNTSecurityDescriptor.py), we can open the file and parse its content precisely:
 
 ```
 ./DescribeNTSecurityDescriptor.py ./example_value.txt
@@ -63,6 +65,12 @@ positional arguments:
 options:
   -h, --help     show this help message and exit
   -v, --verbose  Verbose mode. (default: False)
+```
+
+## Example
+
+```bash
+./DescribeNTSecurityDescriptor.py -u Administrator -p 'Admin123!' -d LAB --dc-ip 10.0.0.101 -D "CN=user user,CN=Users,DC=LAB,DC=local" --summary --describe
 ```
 
 ## Contributing

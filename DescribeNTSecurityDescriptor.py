@@ -1111,48 +1111,26 @@ class AccessControlObjectType(object):
         self.bytesize = 4
         self.flags = AccessControlObjectTypeFlags(struct.unpack("<I", rawData.read(4))[0])
 
+        # Todo create a function to parse the text
+
         if (self.flags & AccessControlObjectTypeFlags.ACE_OBJECT_TYPE_PRESENT) and (self.flags & AccessControlObjectTypeFlags.ACE_INHERITED_OBJECT_TYPE_PRESENT):
             self.bytesize += 16
             self.ObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
-            if self.ObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
-                self.ObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.ObjectTypeGuid.toFormatD()).name
-            elif self.ObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
-                self.ObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.ObjectTypeGuid.toFormatD()).name
-            elif self.ldap_searcher is not None:
-                if self.ObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
-                    self.ObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.ObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
+            self.ObjectTypeGuid_text = self.resolve_name(objectGuid=self.ObjectTypeGuid) 
 
             self.bytesize += 16
             self.InheritedObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
-            if self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
-                self.InheritedObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.InheritedObjectTypeGuid.toFormatD()).name
-            elif self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
-                self.InheritedObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.InheritedObjectTypeGuid.toFormatD()).name
-            elif self.ldap_searcher is not None:
-                if self.InheritedObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
-                    self.InheritedObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.InheritedObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
+            self.InheritedObjectTypeGuid_text = self.resolve_name(objectGuid=self.InheritedObjectTypeGuid)
 
         elif (self.flags & AccessControlObjectTypeFlags.ACE_OBJECT_TYPE_PRESENT):
             self.bytesize += 16
             self.ObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
-            if self.ObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
-                self.ObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.ObjectTypeGuid.toFormatD()).name
-            elif self.ObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
-                self.ObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.ObjectTypeGuid.toFormatD()).name
-            elif self.ldap_searcher is not None:
-                if self.ObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
-                    self.ObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.ObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
+            self.ObjectTypeGuid_text = self.resolve_name(objectGuid=self.ObjectTypeGuid)
 
         elif (self.flags & AccessControlObjectTypeFlags.ACE_INHERITED_OBJECT_TYPE_PRESENT):
             self.bytesize += 16
             self.InheritedObjectTypeGuid = GUID.fromRawBytes(rawData.read(16))
-            if self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in ExtendedRights]:
-                self.InheritedObjectTypeGuid_text = "ExtendedRight: %s" % ExtendedRights(self.InheritedObjectTypeGuid.toFormatD()).name
-            elif self.InheritedObjectTypeGuid.toFormatD() in [_.value for _ in PropertySet]:
-                self.InheritedObjectTypeGuid_text = "PropertySet: %s" % PropertySet(self.InheritedObjectTypeGuid.toFormatD()).name
-            elif self.ldap_searcher is not None:
-                if self.InheritedObjectTypeGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
-                    self.InheritedObjectTypeGuid_text = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[self.InheritedObjectTypeGuid.toFormatD()]["ldapDisplayName"]   
+            self.InheritedObjectTypeGuid_text = self.resolve_name(objectGuid=self.InheritedObjectTypeGuid)
 
         if self.verbose:
             self.describe()
@@ -1185,6 +1163,24 @@ class AccessControlObjectType(object):
                 print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), self.InheritedObjectTypeGuid.toFormatD()))
         
         print(''.join([" │ "]*indent + [" └─"]))
+
+    def resolve_name(self, objectGuid):
+        name = None
+
+        # Parse Extended Rights
+        if objectGuid.toFormatD() in [_.value for _ in ExtendedRights]:
+            name = "Extended Right %s" % ExtendedRights(objectGuid.toFormatD()).name
+        
+        # Parse Property Set
+        elif objectGuid.toFormatD() in [_.value for _ in PropertySet]:
+            name = "Property Set %s" % PropertySet(objectGuid.toFormatD()).name
+        
+        # Else, we don't know the object, print its GUID
+        elif self.ldap_searcher is not None:
+            if objectGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
+                name = "LDAP Attribute %s" % self.ldap_searcher.schemaIDGUID[objectGuid.toFormatD()]["ldapDisplayName"]   
+        
+        return name
 
     def __getitem__(self, key):
         return self.__data[key]
@@ -2425,13 +2421,26 @@ class HumanDescriber(object):
                 else:
                     str_target = "me"
 
+                str_inheritedtarget = None
+                if ace.object_type is not None:
+                    if ace.object_type.InheritedObjectTypeGuid_text is not None:
+                        str_inheritedtarget = ace.object_type.InheritedObjectTypeGuid_text
+                        str_target += " (inherited from the %s)" % str_inheritedtarget 
+                    elif ace.object_type.InheritedObjectTypeGuid is not None:
+                        str_inheritedtarget = ace.object_type.InheritedObjectTypeGuid.toFormatD()
+                        str_target += " (inherited from the object %s)" % str_inheritedtarget 
+                else:
+                    str_inheritedtarget = None
+
                 # Check inheritance
                 if (ace.header.AceFlags & AccessControlEntry_Flags.INHERITED_ACE):
                     print("%03d. '\x1b[94m%s\x1b[0m' is \x1b[92mallowed\x1b[0m to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m" % (entry_id, identityDisplayName, str_rights, str_target))
                 else:
                     print("%03d. '\x1b[94m%s\x1b[0m' is \x1b[92mallowed\x1b[0m to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m, by inheritance." % (entry_id, identityDisplayName, str_rights, str_target))
             else:
-                print("%d. UNHANDLED" % (entry_id))
+                print("%03d. \x1b[91mUNHANDLED\x1b[0m" % (entry_id))
+        else:
+            print("%03d. \x1b[91mUNHANDLED ace type '%s'\x1b[0m" % (entry_id, ace.header.AceType.name))
 
     def explain_access_mask(self, ace):
         mapping = {
@@ -2454,7 +2463,8 @@ class HumanDescriber(object):
             "GENERIC_READ": "Generic Read"
         }
         rights = []
-        for flag in AccessMaskFlags(ace.mask.AccessMask):
+        access_flags = list(AccessMaskFlags(ace.mask.AccessMask))
+        for flag in access_flags:
             rights.append(mapping[flag.name])
         
         return "%s" % ', '.join(rights)
@@ -2501,13 +2511,14 @@ def parseArgs():
         print("\n[+] At least one option of --summary and/or --describe is needed.\n")
         sys.exit(1)
 
-    if options.auth_password is None and options.no_pass == False and options.auth_hashes is None:
-        print("[+] No password of hashes provided and --no-pass is '%s'" % options.no_pass)
-        from getpass import getpass
-        if options.auth_domain is not None:
-            options.auth_password = getpass("  | Provide a password for '%s\\%s':" % (options.auth_domain, options.auth_username))
-        else:
-            options.auth_password = getpass("  | Provide a password for '%s':" % options.auth_username)
+    if options.auth_username is not None:
+        if options.auth_password is None and options.no_pass == False and options.auth_hashes is None:
+            print("[+] No password of hashes provided and --no-pass is '%s'" % options.no_pass)
+            from getpass import getpass
+            if options.auth_domain is not None:
+                options.auth_password = getpass("  | Provide a password for '%s\\%s':" % (options.auth_domain, options.auth_username))
+            else:
+                options.auth_password = getpass("  | Provide a password for '%s':" % options.auth_username)
 
     return options
 
