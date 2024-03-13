@@ -2467,7 +2467,9 @@ def parseArgs():
 
     parser.add_argument("-V", "--verbose", default=False, action="store_true", help="Verbose mode. (default: False)")
     
-    parser.add_argument("-v", "--value", type=str, help="The value to be described by the NTSecurityDescriptor")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("-v", "--value", default=None, type=str, help="The value to be described by the NTSecurityDescriptor")
+    source.add_argument("-D", "--distinguishedName", default=None, type=str, help="The distinguishedName of the object to be described by the NTSecurityDescriptor")
     
     parser.add_argument("--use-ldaps", action="store_true", default=False, help="Use LDAPS instead of LDAP")
 
@@ -2553,24 +2555,48 @@ if __name__ == "__main__":
         )
         ls.generate_guid_map_from_ldap()
 
-    if os.path.isfile(options.value):
-        print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
-        filename = options.value
-        options.value = open(filename, 'r').read().strip()
-    if re.compile(r'^[0-9a-fA-F]+$').match(options.value):
-        options.value = binascii.unhexlify(options.value)
+    raw_ntsd_value = None
+    # Read value from the LDAP
+    if options.distinguishedName is not None and ls is not None:
+        print("[+] Loading ntSecurityDescriptor from the LDAP object '%s'" % options.distinguishedName)
+        try:
+            results = {}
+            results = ls.query(
+                base_dn=options.distinguishedName,
+                query="(distinguishedName=%s)" % options.distinguishedName,
+                attributes=["ntSecurityDescriptor"]
+            )
+        except Exception as e:
+            print("[!] Error: %s" % e)
 
-    ntsd = NTSecurityDescriptor(
-        value=options.value, 
-        verbose=options.verbose,
-        ldap_searcher=ls
-    )
-    if options.verbose:
-        print("[>] Final result " + "".center(80,"="))
+        if len(results.keys()) != 0:
+            raw_ntsd_value = results[options.distinguishedName]["ntSecurityDescriptor"]
+            print("[+] ntSecurityDescriptor is loaded!")
+        else:
+            print("[!] Could not find an object with the distinguishedName '%s'" % options.distinguishedName)
 
-    if options.describe or options.verbose:
-        ntsd.describe()
+    # Read value from a file
+    elif options.value is not None:
+        if os.path.isfile(options.value):
+            print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
+            filename = options.value
+            raw_ntsd_value = open(filename, 'r').read().strip()
+        if re.compile(r'^[0-9a-fA-F]+$').match(raw_ntsd_value):
+            raw_ntsd_value = binascii.unhexlify(raw_ntsd_value)
 
-    if options.summary or options.verbose:
-        print("\n" + "==[Summary]".ljust(80,'=') + "\n")
-        HumanDescriber(ntsd=ntsd).summary()
+    # Parse value
+    if raw_ntsd_value is not None:
+        ntsd = NTSecurityDescriptor(
+            value=raw_ntsd_value, 
+            verbose=options.verbose,
+            ldap_searcher=ls
+        )
+        if options.verbose:
+            print("[>] Final result " + "".center(80,"="))
+
+        if options.describe or options.verbose:
+            ntsd.describe()
+
+        if options.summary or options.verbose:
+            print("\n" + "==[Summary]".ljust(80,'=') + "\n")
+            HumanDescriber(ntsd=ntsd).summary()
