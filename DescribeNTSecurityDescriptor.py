@@ -28,11 +28,30 @@ LDAP_PAGED_RESULT_OID_STRING = "1.2.840.113556.1.4.319"
 # https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/f14f3610-ee22-4d07-8a24-1bf1466cba5f
 LDAP_SERVER_NOTIFICATION_OID = "1.2.840.113556.1.4.528"
 
+
 class LDAPSearcher(object):
-    def __init__(self, ldap_server, ldap_session):
+    """
+    LDAPSearcher is a utility class designed to facilitate the execution of LDAP queries against an LDAP server.
+    It encapsulates the details of establishing a session with an LDAP server, constructing and executing queries,
+    and processing the results. This class aims to simplify LDAP interactions, making it easier to retrieve and
+    manipulate directory information.
+
+    Attributes:
+        ldap_server (str): The address of the LDAP server to connect to.
+        ldap_session (ldap3.Connection): An established session with the LDAP server.
+        debug (bool): A flag indicating whether to output debug information.
+
+    Methods:
+        query(base_dn, query, attributes, page_size): Executes an LDAP query and returns the results.
+    """
+
+    schemaIDGUID = {}
+
+    def __init__(self, ldap_server, ldap_session, debug=False):
         super(LDAPSearcher, self).__init__()
         self.ldap_server = ldap_server
         self.ldap_session = ldap_session
+        self.debug = debug
 
     def query(self, base_dn, query, attributes=['*'], page_size=1000):
         """
@@ -143,6 +162,54 @@ class LDAPSearcher(object):
         except Exception as e:
             raise e
         return results
+
+    def generate_guid_map_from_ldap(self):
+        if self.debug:
+            print("[>] Extracting the list of schemaIDGUID ...")
+
+        results = self.query(
+            base_dn=self.ldap_server.info.other["schemaNamingContext"],
+            query="(schemaIDGUID=*)",
+            attributes=["*"]
+        )
+
+        self.schemaIDGUID = {}
+        for distinguishedName in results.keys():
+            __guid = GUID.load(data=results[distinguishedName]["schemaIDGUID"])
+            self.schemaIDGUID[__guid.toFormatD()] = results[distinguishedName]
+            self.schemaIDGUID[__guid.toFormatD()]["distinguishedName"] = distinguishedName
+
+        if self.debug:
+            print("[>] done.")
+
+
+class PropertySet(Enum):
+    """
+    PropertySet is an enumeration of GUIDs representing various property sets in Active Directory.
+    These property sets group related properties of AD objects, making it easier to manage and apply permissions to these properties.
+    Each entry in this enumeration maps a human-readable name to the corresponding GUID of the property set.
+    These GUIDs are used in Access Control Entries (ACEs) to grant or deny permissions to read or write a set of properties on AD objects.
+
+    The GUIDs are defined by Microsoft and can be found in the Microsoft documentation and technical specifications.
+    Property sets are a crucial part of the Active Directory schema and help in defining the security model by allowing fine-grained access control.
+
+    https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/177c0db5-fa12-4c31-b75a-473425ce9cca
+    """
+    DOMAIN_PASSWORD_AND_LOCKOUT_POLICIES = "c7407360-20bf-11d0-a768-00aa006e0529"
+    GENERAL_INFORMATION = "59ba2f42-79a2-11d0-9020-00c04fc2d3cf"
+    ACCOUNT_RESTRICTIONS = "4c164200-20c0-11d0-a768-00aa006e0529"
+    LOGON_INFORMATION = "5f202010-79a5-11d0-9020-00c04fc2d4cf"
+    GROUP_MEMBERSHIP = "bc0ac240-79a9-11d0-9020-00c04fc2d4cf"
+    PHONE_AND_MAIL_OPTIONS = "e45795b2-9455-11d1-aebd-0000f80367c1"
+    PERSONAL_INFORMATION = "77b5b886-944a-11d1-aebd-0000f80367c1"
+    WEB_INFORMATION = "e45795b3-9455-11d1-aebd-0000f80367c1"
+    PUBLIC_INFORMATION = "e48d0154-bcf8-11d1-8702-00c04fb96050"
+    REMOTE_ACCESS_INFORMATION = "037088f8-0ae1-11d2-b422-00a0c968f939"
+    OTHER_DOMAIN_PARAMETERS_FOR_USE_BY_SAM = "b8119fd0-04f6-4762-ab7a-4986c76b3f9a"
+    DNS_HOST_NAME_ATTRIBUTES = "72e39547-7b18-11d1-adef-00c04fd8d5cd"
+    MS_TS_GATEWAYACCESS = "ffa6f046-ca4b-4feb-b40d-04dfee722543"
+    PRIVATE_INFORMATION = "91e647de-d96f-4b70-9557-d63ff4f3ccd8"
+    TERMINAL_SERVER_LICENSE_SERVER = "5805bc62-bdc9-4428-a5e2-856a0f4c185e"
 
 
 class ExtendedRights(Enum):
@@ -780,7 +847,6 @@ class GUID(object):
     def __repr__(self):
         return "<GUID %s>" % self.toFormatB()
 
-
 ## 
 
 class OwnerSID(object):
@@ -1019,9 +1085,10 @@ class AccessControlObjectType(object):
         describe(offset=0, indent=0): Prints a formatted description of the Access Control Object Type.
     """
 
-    def __init__(self, value, verbose=False):
-        self.verbose = verbose
+    def __init__(self, value, ldap_searcher=None, verbose=False):
         self.value = value
+        self.ldap_searcher = ldap_searcher
+        self.verbose = verbose
         #
         self.bytesize = 0
         self.ObjectTypeGuid = None
@@ -1076,15 +1143,33 @@ class AccessControlObjectType(object):
         
         if self.ObjectTypeGuid is not None:
             guid_format_d = self.ObjectTypeGuid.toFormatD()
-            if guid_format_d in [er.value for er in ExtendedRights]:
-                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), guid_format_d, ExtendedRights(guid_format_d).name))
+            guid_name = None
+            if guid_format_d in [_.value for _ in ExtendedRights]:
+                guid_name = "ExtendedRight: %s" % ExtendedRights(guid_format_d).name
+            elif guid_format_d in [_.value for _ in PropertySet]:
+                guid_name = "PropertySet: %s" % PropertySet(guid_format_d).name
+            elif self.ldap_searcher is not None:
+                if guid_format_d in self.ldap_searcher.schemaIDGUID.keys():
+                    guid_name = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[guid_format_d]["ldapDisplayName"]
+
+            if guid_name is not None:
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), guid_format_d, guid_name))
             else:
                 print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "ObjectTypeGuid".ljust(padding_len), guid_format_d))
         
         if self.InheritedObjectTypeGuid is not None:
             guid_format_d = self.InheritedObjectTypeGuid.toFormatD()
-            if guid_format_d in [er.value for er in ExtendedRights]:
-                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), guid_format_d, ExtendedRights(guid_format_d).name))
+            guid_name = None
+            if guid_format_d in [_.value for _ in ExtendedRights]:
+                guid_name = "ExtendedRight: %s" % ExtendedRights(guid_format_d).name
+            elif guid_format_d in [_.value for _ in PropertySet]:
+                guid_name = "PropertySet: %s" % PropertySet(guid_format_d).name
+            elif self.ldap_searcher is not None:
+                if guid_format_d in self.ldap_searcher.schemaIDGUID.keys():
+                    guid_name = "LDAP Attribute: %s" % self.ldap_searcher.schemaIDGUID[guid_format_d]["ldapDisplayName"]
+
+            if guid_name is not None:
+                print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), guid_format_d, guid_name))
             else:
                 print("%s │ \x1b[93m%s\x1b[0m : \x1b[96m%s\x1b[0m" % (indent_prompt, "InheritedObjectTypeGuid".ljust(padding_len), guid_format_d))
         
@@ -1465,7 +1550,7 @@ class AccessControlEntry(object):
             # ACE_HEADER, as well as by any protection against inheritance placed on the child
             # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
             # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
-            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.object_type = AccessControlObjectType(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.object_type.bytesize:]
             self.bytesize += self.object_type.bytesize
 
@@ -1503,7 +1588,7 @@ class AccessControlEntry(object):
             # ACE_HEADER, as well as by any protection against inheritance placed on the child
             # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
             # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
-            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.object_type = AccessControlObjectType(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.object_type.bytesize:]
             self.bytesize += self.object_type.bytesize
 
@@ -1541,7 +1626,7 @@ class AccessControlEntry(object):
             # ACE_HEADER, as well as by any protection against inheritance placed on the child
             # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
             # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
-            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.object_type = AccessControlObjectType(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.object_type.bytesize:]
             self.bytesize += self.object_type.bytesize
 
@@ -1628,7 +1713,7 @@ class AccessControlEntry(object):
             # ACE_HEADER, as well as by any protection against inheritance placed on the child
             # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
             # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
-            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.object_type = AccessControlObjectType(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.object_type.bytesize:]
             self.bytesize += self.object_type.bytesize
 
@@ -1670,7 +1755,7 @@ class AccessControlEntry(object):
             # ACE_HEADER, as well as by any protection against inheritance placed on the child
             # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
             # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
-            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.object_type = AccessControlObjectType(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.object_type.bytesize:]
             self.bytesize += self.object_type.bytesize
 
@@ -1739,7 +1824,7 @@ class AccessControlEntry(object):
             # ACE_HEADER, as well as by any protection against inheritance placed on the child
             # objects. This field is valid only if the ACE_INHERITED_OBJECT_TYPE_PRESENT bit is set
             # in the Flags member. Otherwise, the InheritedObjectType field is ignored.
-            self.object_type = AccessControlObjectType(value=self.value, verbose=self.verbose)
+            self.object_type = AccessControlObjectType(value=self.value, ldap_searcher=self.ldap_searcher, verbose=self.verbose)
             self.value = self.value[self.object_type.bytesize:]
             self.bytesize += self.object_type.bytesize
 
@@ -2296,9 +2381,7 @@ def parseArgs():
     parser = argparse.ArgumentParser(add_help=True, description="Parse and describe the contents of a raw ntSecurityDescriptor structure")
 
     parser.add_argument("-V", "--verbose", default=False, action="store_true", help="Verbose mode. (default: False)")
-
     parser.add_argument("-v", "--value", type=str, help="The value to be described by the NTSecurityDescriptor")
-
     parser.add_argument('--use-ldaps', action='store_true', help='Use LDAPS instead of LDAP')
     
     authconn = parser.add_argument_group('authentication & connection')
@@ -2364,6 +2447,7 @@ if __name__ == "__main__":
             ldap_server=ldap_server,
             ldap_session=ldap_session
         )
+        ls.generate_guid_map_from_ldap()
 
     if os.path.isfile(options.value):
         print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
