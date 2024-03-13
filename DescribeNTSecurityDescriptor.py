@@ -2381,29 +2381,41 @@ def parseArgs():
     parser = argparse.ArgumentParser(add_help=True, description="Parse and describe the contents of a raw ntSecurityDescriptor structure")
 
     parser.add_argument("-V", "--verbose", default=False, action="store_true", help="Verbose mode. (default: False)")
-    parser.add_argument("-v", "--value", type=str, help="The value to be described by the NTSecurityDescriptor")
-    parser.add_argument('--use-ldaps', action='store_true', help='Use LDAPS instead of LDAP')
     
-    authconn = parser.add_argument_group('authentication & connection')
-    authconn.add_argument('--dc-ip', action='store', metavar="ip address", help='IP Address of the domain controller or KDC (Key Distribution Center) for Kerberos. If omitted it will use the domain part (FQDN) specified in the identity parameter')
-    authconn.add_argument('--kdcHost', dest="kdcHost", action='store', metavar="FQDN KDC", help='FQDN of KDC for Kerberos.')
+    parser.add_argument("-v", "--value", type=str, help="The value to be described by the NTSecurityDescriptor")
+    
+    parser.add_argument("--use-ldaps", action="store_true", default=False, help="Use LDAPS instead of LDAP")
+    parser.add_argument("--summary", action="store_true", default=False, help="Generate a human readable summary of the rights.")
+
+    authconn = parser.add_argument_group("authentication & connection")
+    authconn.add_argument("--dc-ip", action="store", metavar="ip address", help="IP Address of the domain controller or KDC (Key Distribution Center) for Kerberos. If omitted it will use the domain part (FQDN) specified in the identity parameter")
+    authconn.add_argument("--kdcHost", dest="kdcHost", action="store", metavar="FQDN KDC", help="FQDN of KDC for Kerberos.")
     authconn.add_argument("-d", "--domain", dest="auth_domain", metavar="DOMAIN", action="store", help="(FQDN) domain to authenticate to")
     authconn.add_argument("-u", "--user", dest="auth_username", metavar="USER", action="store", help="user to authenticate with")
 
     secret = parser.add_argument_group()
     cred = secret.add_mutually_exclusive_group()
-    cred.add_argument('--no-pass', action="store_true", help='don\'t ask for password (useful for -k)')
+    cred.add_argument("--no-pass", action="store_true", help="don\"t ask for password (useful for -k)")
     cred.add_argument("-p", "--password", dest="auth_password", metavar="PASSWORD", action="store", help="password to authenticate with")
-    cred.add_argument("-H", "--hashes", dest="auth_hashes", action="store", metavar="[LMHASH:]NTHASH", help='NT/LM hashes, format is LMhash:NThash')
-    cred.add_argument('--aes-key', dest="auth_key", action="store", metavar="hex key", help='AES key to use for Kerberos Authentication (128 or 256 bits)')
-    secret.add_argument("-k", "--kerberos", dest="use_kerberos", action="store_true", help='Use Kerberos authentication. Grabs credentials from .ccache file (KRB5CCNAME) based on target parameters. If valid credentials cannot be found, it will use the ones specified in the command line')
-
-
+    cred.add_argument("-H", "--hashes", dest="auth_hashes", action="store", metavar="[LMHASH:]NTHASH", help="NT/LM hashes, format is LMhash:NThash")
+    cred.add_argument("--aes-key", dest="auth_key", action="store", metavar="hex key", help="AES key to use for Kerberos Authentication (128 or 256 bits)")
+    secret.add_argument("-k", "--kerberos", dest="use_kerberos", action="store_true", help="Use Kerberos authentication. Grabs credentials from .ccache file (KRB5CCNAME) based on target parameters. If valid credentials cannot be found, it will use the ones specified in the command line")
+    
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
+        
+    options = parser.parse_args()
+    
+    if options.auth_password is None and options.no_pass == False and options.auth_hashes is None:
+        print("[+] No password of hashes provided and --no-pass is '%s'" % options.no_pass)
+        from getpass import getpass
+        if options.auth_domain is not None:
+            options.auth_password = getpass("  | Provide a password for '%s\\%s':" % (options.auth_domain, options.auth_username))
+        else:
+            options.auth_password = getpass("  | Provide a password for '%s':" % options.auth_username)
 
-    return parser.parse_args()
+    return options
 
 
 if __name__ == "__main__":
@@ -2465,3 +2477,7 @@ if __name__ == "__main__":
         print("[>] Final result " + "".center(80,"="))
 
     ntsd.describe()
+
+    if options.summary:
+        print("==[Summary]".ljust(80,'='))
+        # TODO
