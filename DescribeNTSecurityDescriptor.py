@@ -103,7 +103,7 @@ class LDAPSearcher(object):
                 for entry in self.ldap_session.response:
                     if entry['type'] != 'searchResEntry':
                         continue
-                    results[entry['dn']] = entry["attributes"]
+                    results[entry['dn'].lower()] = entry["attributes"]
         except ldap3.core.exceptions.LDAPInvalidFilterError as e:
             print("Invalid Filter. (ldap3.core.exceptions.LDAPInvalidFilterError)")
         except Exception as e:
@@ -2574,14 +2574,14 @@ if __name__ == "__main__":
             results = {}
             results = ls.query(
                 base_dn=options.distinguishedName,
-                query="(distinguishedName=%s)" % options.distinguishedName,
+                query="(distinguishedName=%s)" % options.distinguishedName.lower(),
                 attributes=["ntSecurityDescriptor"]
             )
         except Exception as e:
             print("[!] Error: %s" % e)
 
         if len(results.keys()) != 0:
-            raw_ntsd_value = results[options.distinguishedName]["ntSecurityDescriptor"]
+            raw_ntsd_value = results[options.distinguishedName.lower()]["ntSecurityDescriptor"]
             print("[+] ntSecurityDescriptor is loaded!")
         else:
             print("[!] Could not find an object with the distinguishedName '%s'" % options.distinguishedName)
