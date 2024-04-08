@@ -1,0 +1,2 @@
+ldap3
+sectools>=1.4.3
