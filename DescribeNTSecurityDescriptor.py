@@ -899,10 +899,10 @@ class OwnerSID(object):
                     attributes=["sAMAccountName"]
                 )
                 if len(__ldap_results.keys()) != 0:
-                    __dn = list(__ldap_results.keys())[0]
+                    __dn = list(__ldap_results.keys())[0].upper()
                     __dc_string = "DC=" + __dn.split(',DC=',1)[1]
                     __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
-                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn]["sAMAccountName"])
+                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn.lower()]["sAMAccountName"])
 
         if self.verbose:
             self.describe()
@@ -968,10 +968,10 @@ class GroupSID(object):
                     attributes=["sAMAccountName"]
                 )
                 if len(__ldap_results.keys()) != 0:
-                    __dn = list(__ldap_results.keys())[0]
+                    __dn = list(__ldap_results.keys())[0].upper()
                     __dc_string = "DC=" + __dn.split(',DC=',1)[1]
                     __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
-                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn]["sAMAccountName"])
+                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn.lower()]["sAMAccountName"])
 
         if self.verbose:
             self.describe()
@@ -1036,10 +1036,10 @@ class ACESID(object):
                     attributes=["sAMAccountName"]
                 )
                 if len(__ldap_results.keys()) != 0:
-                    __dn = list(__ldap_results.keys())[0]
+                    __dn = list(__ldap_results.keys())[0].upper()
                     __dc_string = "DC=" + __dn.split(',DC=',1)[1]
                     __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
-                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn]["sAMAccountName"])
+                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn.lower()]["sAMAccountName"])
 
         # 
         if self.verbose:
