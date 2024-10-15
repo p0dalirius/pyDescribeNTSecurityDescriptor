@@ -175,9 +175,24 @@ class LDAPSearcher(object):
 
         self.schemaIDGUID = {}
         for distinguishedName in results.keys():
-            __guid = GUID.load(data=results[distinguishedName]["schemaIDGUID"])
-            self.schemaIDGUID[__guid.toFormatD()] = results[distinguishedName]
-            self.schemaIDGUID[__guid.toFormatD()]["distinguishedName"] = distinguishedName
+            if type(results[distinguishedName]["schemaIDGUID"]) == bytes:
+                __guid = GUID.load(data=results[distinguishedName]["schemaIDGUID"])
+            elif type(results[distinguishedName]["schemaIDGUID"]) == list:
+                __guid = GUID.load(data=results[distinguishedName]["schemaIDGUID"][0])
+
+            if __guid is not None:
+                self.schemaIDGUID[__guid.toFormatD()] = results[distinguishedName]
+
+                # Remove lists on some attributes
+                for attribute in ["displayName", "ldapDisplayName", "sAMAccountName", "name"]:
+                    if attribute in self.schemaIDGUID[__guid.toFormatD()].keys():
+                        if type(self.schemaIDGUID[__guid.toFormatD()][attribute]) == list:
+                            self.schemaIDGUID[__guid.toFormatD()][attribute] = self.schemaIDGUID[__guid.toFormatD()][attribute][0]
+
+                if type(distinguishedName) == list:
+                    distinguishedName = distinguishedName[0]
+
+                self.schemaIDGUID[__guid.toFormatD()]["distinguishedName"] = distinguishedName
 
         if self.debug:
             print("[>] done.")
@@ -888,21 +903,24 @@ class OwnerSID(object):
         __sid_str_repr = self.sid.toString()
         if __sid_str_repr in self.sid.wellKnownSIDs.keys():
             self.displayName = self.sid.wellKnownSIDs[__sid_str_repr]
-        
+
         # Try to resolve it from the LDAP
         if self.displayName is None:
             if self.ldap_searcher is not None:
                 search_base = ldap_server.info.other["defaultNamingContext"][0]
-                __ldap_results = self.ldap_searcher.query(
+                ldap_results = self.ldap_searcher.query(
                     base_dn=search_base,
                     query="(objectSid=%s)" % self.sid.toString(),
                     attributes=["sAMAccountName"]
                 )
-                if len(__ldap_results.keys()) != 0:
-                    __dn = list(__ldap_results.keys())[0].upper()
-                    __dc_string = "DC=" + __dn.split(',DC=',1)[1]
-                    __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
-                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn.lower()]["sAMAccountName"])
+                if len(ldap_results.keys()) != 0:
+                    dn = list(ldap_results.keys())[0].upper()
+                    dc_string = "DC=" + dn.split(',DC=',1)[1]
+                    domain = '.'.join([dc.replace('DC=','',1) for dc in dc_string.split(',')])
+                    sAMAccountName = ldap_results[dn.lower()]["sAMAccountName"]
+                    if type(sAMAccountName) == list:
+                        sAMAccountName = sAMAccountName[0]
+                    self.displayName = "%s\\%s" % (domain, sAMAccountName)
 
         if self.verbose:
             self.describe()
@@ -910,7 +928,6 @@ class OwnerSID(object):
     def describe(self, offset=0, indent=0):
         indent_prompt = " │ " * indent
         print("%s<OwnerSID at offset \x1b[95m0x%x\x1b[0m (size=\x1b[95m0x%x\x1b[0m)>" % (indent_prompt, offset, self.bytesize))
-        str_repr = self.sid.toString()
         if self.displayName is not None:
             print("%s │ \x1b[93mSID\x1b[0m : \x1b[96m%s\x1b[0m (\x1b[94m%s\x1b[0m)" % (indent_prompt, self.sid.toString(), self.displayName))
         else:
@@ -957,21 +974,27 @@ class GroupSID(object):
         __sid_str_repr = self.sid.toString()
         if __sid_str_repr in self.sid.wellKnownSIDs.keys():
             self.displayName = self.sid.wellKnownSIDs[__sid_str_repr]
-        
+
         # Try to resolve it from the LDAP
         if self.displayName is None:
             if self.ldap_searcher is not None:
                 search_base = ldap_server.info.other["defaultNamingContext"][0]
-                __ldap_results = self.ldap_searcher.query(
+                ldap_results = self.ldap_searcher.query(
                     base_dn=search_base,
                     query="(objectSid=%s)" % self.sid.toString(),
                     attributes=["sAMAccountName"]
                 )
-                if len(__ldap_results.keys()) != 0:
-                    __dn = list(__ldap_results.keys())[0].upper()
-                    __dc_string = "DC=" + __dn.split(',DC=',1)[1]
-                    __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
-                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn.lower()]["sAMAccountName"])
+                if len(ldap_results.keys()) != 0:
+                    dn = list(ldap_results.keys())[0].upper()
+                    dc_string = "DC=" + dn.split(',DC=',1)[1]
+                    domain = '.'.join([dc.replace('DC=','',1) for dc in dc_string.split(',')])
+                    sAMAccountName = ldap_results[dn.lower()]["sAMAccountName"]
+                    if type(sAMAccountName) == list:
+                        sAMAccountName = sAMAccountName[0]
+                    self.displayName = "%s\\%s" % (domain, sAMAccountName)
+
+        if self.verbose:
+            self.describe()
 
         if self.verbose:
             self.describe()
@@ -1025,21 +1048,24 @@ class ACESID(object):
         __sid_str_repr = self.sid.toString()
         if __sid_str_repr in self.sid.wellKnownSIDs.keys():
             self.displayName = self.sid.wellKnownSIDs[__sid_str_repr]
-        
+            
         # Try to resolve it from the LDAP
         if self.displayName is None:
             if self.ldap_searcher is not None:
                 search_base = ldap_server.info.other["defaultNamingContext"][0]
-                __ldap_results = self.ldap_searcher.query(
+                ldap_results = self.ldap_searcher.query(
                     base_dn=search_base,
                     query="(objectSid=%s)" % self.sid.toString(),
                     attributes=["sAMAccountName"]
                 )
-                if len(__ldap_results.keys()) != 0:
-                    __dn = list(__ldap_results.keys())[0].upper()
-                    __dc_string = "DC=" + __dn.split(',DC=',1)[1]
-                    __domain = '.'.join([dc.replace('DC=','',1) for dc in __dc_string.split(',')])
-                    self.displayName = "%s\\%s" % (__domain, __ldap_results[__dn.lower()]["sAMAccountName"])
+                if len(ldap_results.keys()) != 0:
+                    dn = list(ldap_results.keys())[0].upper()
+                    dc_string = "DC=" + dn.split(',DC=',1)[1]
+                    domain = '.'.join([dc.replace('DC=','',1) for dc in dc_string.split(',')])
+                    sAMAccountName = ldap_results[dn.lower()]["sAMAccountName"]
+                    if type(sAMAccountName) == list:
+                        sAMAccountName = sAMAccountName[0]
+                    self.displayName = "%s\\%s" % (domain, sAMAccountName)
 
         # 
         if self.verbose:
@@ -1167,19 +1193,22 @@ class AccessControlObjectType(object):
     def resolve_name(self, objectGuid):
         name = None
 
-        # Parse Extended Rights
+        # Parse Extended Rights from the docs
         if objectGuid.toFormatD() in [_.value for _ in ExtendedRights]:
             name = "Extended Right %s" % ExtendedRights(objectGuid.toFormatD()).name
         
-        # Parse Property Set
+        # Parse Property Set from the docs
         elif objectGuid.toFormatD() in [_.value for _ in PropertySet]:
             name = "Property Set %s" % PropertySet(objectGuid.toFormatD()).name
         
-        # Else, we don't know the object, print its GUID
+        # Find from the docs
         elif self.ldap_searcher is not None:
             if objectGuid.toFormatD() in self.ldap_searcher.schemaIDGUID.keys():
-                name = "LDAP Attribute %s" % self.ldap_searcher.schemaIDGUID[objectGuid.toFormatD()]["ldapDisplayName"]   
-        
+                ldapDisplayName = self.ldap_searcher.schemaIDGUID[objectGuid.toFormatD()]["ldapDisplayName"]
+                if type(ldapDisplayName) == list:
+                    ldapDisplayName = ldapDisplayName[0]
+                name = "LDAP Attribute %s" % ldapDisplayName
+
         return name
 
     def __getitem__(self, key):
@@ -2398,49 +2427,48 @@ class HumanDescriber(object):
 
     def explain_ace(self, ace, entry_id=0):
         # Checking allowed rights
-        if ace.header.AceType in [
-            AccessControlEntry_Type.ACCESS_ALLOWED_ACE_TYPE, 
-            AccessControlEntry_Type.ACCESS_ALLOWED_OBJECT_ACE_TYPE
-        ]:
-            if ace.ace_sid is not None:
-                if ace.ace_sid.displayName is not None:
-                    identityDisplayName = ace.ace_sid.displayName
-                else:
-                    identityDisplayName = ace.ace_sid.sid
+        if ace.header.AceType.name.startswith("ACCESS_ALLOWED_"):
+            str_ace_type = "\x1b[92mallowed\x1b[0m"
+        elif ace.header.AceType.name.startswith("ACCESS_DENIED_"):
+            str_ace_type = "\x1b[91mnot allowed\x1b[0m"
 
-                # Parse rights
-                str_rights = self.explain_access_mask(ace=ace)
-
-                # Parse target
-                str_target = "me"
-                if ace.object_type is not None:
-                    if ace.object_type.ObjectTypeGuid_text is not None:
-                        str_target = "my " + ace.object_type.ObjectTypeGuid_text
-                    elif ace.object_type.ObjectTypeGuid is not None:
-                        str_target = ace.object_type.ObjectTypeGuid.toFormatD()
-                else:
-                    str_target = "me"
-
-                str_inheritedtarget = None
-                if ace.object_type is not None:
-                    if ace.object_type.InheritedObjectTypeGuid_text is not None:
-                        str_inheritedtarget = ace.object_type.InheritedObjectTypeGuid_text
-                        str_target += " (inherited from the %s)" % str_inheritedtarget 
-                    elif ace.object_type.InheritedObjectTypeGuid is not None:
-                        str_inheritedtarget = ace.object_type.InheritedObjectTypeGuid.toFormatD()
-                        str_target += " (inherited from the object %s)" % str_inheritedtarget 
-                else:
-                    str_inheritedtarget = None
-
-                # Check inheritance
-                if (ace.header.AceFlags & AccessControlEntry_Flags.INHERITED_ACE):
-                    print("%03d. '\x1b[94m%s\x1b[0m' is \x1b[92mallowed\x1b[0m to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m" % (entry_id, identityDisplayName, str_rights, str_target))
-                else:
-                    print("%03d. '\x1b[94m%s\x1b[0m' is \x1b[92mallowed\x1b[0m to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m, by inheritance." % (entry_id, identityDisplayName, str_rights, str_target))
+        if ace.ace_sid is not None:
+            if ace.ace_sid.displayName is not None:
+                identityDisplayName = ace.ace_sid.displayName
             else:
-                print("%03d. \x1b[91mUNHANDLED\x1b[0m" % (entry_id))
+                identityDisplayName = ace.ace_sid.sid
+
+            # Parse rights
+            str_rights = self.explain_access_mask(ace=ace)
+
+            # Parse target
+            str_target = "me"
+            if ace.object_type is not None:
+                if ace.object_type.ObjectTypeGuid_text is not None:
+                    str_target = "my " + ace.object_type.ObjectTypeGuid_text
+                elif ace.object_type.ObjectTypeGuid is not None:
+                    str_target = ace.object_type.ObjectTypeGuid.toFormatD()
+            else:
+                str_target = "me"
+
+            str_inheritedtarget = None
+            if ace.object_type is not None:
+                if ace.object_type.InheritedObjectTypeGuid_text is not None:
+                    str_inheritedtarget = ace.object_type.InheritedObjectTypeGuid_text
+                    str_target += " (inherited from the %s)" % str_inheritedtarget 
+                elif ace.object_type.InheritedObjectTypeGuid is not None:
+                    str_inheritedtarget = ace.object_type.InheritedObjectTypeGuid.toFormatD()
+                    str_target += " (inherited from the object %s)" % str_inheritedtarget 
+            else:
+                str_inheritedtarget = None
+
+            # Check inheritance
+            if (ace.header.AceFlags & AccessControlEntry_Flags.INHERITED_ACE):
+                print("%03d. '\x1b[94m%s\x1b[0m' is %s to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m" % (entry_id, identityDisplayName, str_ace_type, str_rights, str_target))
+            else:
+                print("%03d. '\x1b[94m%s\x1b[0m' is %s to \x1b[93m%s\x1b[0m on \x1b[95m%s\x1b[0m, by inheritance." % (entry_id, identityDisplayName, str_ace_type, str_rights, str_target))
         else:
-            print("%03d. \x1b[91mUNHANDLED ace type '%s'\x1b[0m" % (entry_id, ace.header.AceType.name))
+            print("%03d. \x1b[91mUNHANDLED\x1b[0m" % (entry_id))
 
     def explain_access_mask(self, ace):
         mapping = {
@@ -2597,8 +2625,13 @@ if __name__ == "__main__":
 
     # Parse value
     if raw_ntsd_value is not None:
+
+        # This happens sometimes in results of the LDAP queries
+        if type(raw_ntsd_value) == list:
+            raw_ntsd_value = raw_ntsd_value[0]
+
         ntsd = NTSecurityDescriptor(
-            value=raw_ntsd_value, 
+            value=raw_ntsd_value,
             verbose=options.verbose,
             ldap_searcher=ls
         )
