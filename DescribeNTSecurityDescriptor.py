@@ -2619,19 +2619,27 @@ if __name__ == "__main__":
         if os.path.isfile(options.value):
             print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
             filename = options.value
-            raw_ntsd_value = open(filename, 'r').read().strip()
-
-        if re.compile(r'^[0-9a-fA-F]+$').match(raw_ntsd_value):
-            # Check if the raw_ntsd_value is hex encoded
-            raw_ntsd_value = binascii.unhexlify(raw_ntsd_value)
-        
-        elif re.compile(r'^[A-Za-z0-9+/=]+$').match(raw_ntsd_value):
-            # Check if the raw_ntsd_value is base64 encoded
             try:
-                raw_ntsd_value = binascii.a2b_base64(raw_ntsd_value)
-                print("[+] ntSecurityDescriptor is base64 decoded!")
-            except binascii.Error as e:
-                print("[!] Error decoding base64: %s" % e)
+                raw_ntsd_value = open(filename, 'r').read().strip()
+                if re.compile(r'^[0-9a-fA-F]+$').match(raw_ntsd_value):
+                    # Check if the raw_ntsd_value is hex encoded
+                    if options.verbose:
+                        print("[!] Hex file detected, decoding...")
+                    raw_ntsd_value = binascii.unhexlify(raw_ntsd_value)
+                
+                elif re.compile(r'^[A-Za-z0-9+/=]+$').match(raw_ntsd_value):
+                    # Check if the raw_ntsd_value is base64 encoded
+                    if options.verbose:
+                        print("[!] Base64 file detected, decoding...")
+                    try:
+                        raw_ntsd_value = binascii.a2b_base64(raw_ntsd_value)
+                    except binascii.Error as e:
+                        print("[!] Error decoding base64: %s" % e)
+
+            except UnicodeDecodeError as e:
+                if options.verbose:
+                    print("[!] Binary file detected, reading as binary...")
+                raw_ntsd_value = open(filename, 'rb').read().strip()
 
     # Parse value
     if raw_ntsd_value is not None:
