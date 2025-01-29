@@ -11,7 +11,8 @@
 
 ## Features
 
-- [x] Reads source value from a file or from the LDAP
+- [x] Reads source value from a file containing a raw ntSecurityDescriptor structure, in raw bytes, hex string or base64 string formats.
+- [x] Reads source value from the LDAP.
 - [x] Outputs a human readable summary of accesses with `--summary`
 - [x] Parsing of Access Control Entries (ACE) of various types:
   - [x] ACE type [`ACCESS_ALLOWED_ACE`](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/72e7c7ea-bc02-4c74-a619-818a16bf6adb?wt.mc_id=SEC-MVP-5005286)
@@ -48,7 +49,7 @@ Here is an example of the output of the tool when parsing the ntSecurityDescript
 Using [DescribeNTSecurityDescriptor.py](./DescribeNTSecurityDescriptor.py), we can open the file and parse its content precisely:
 
 ```
-./DescribeNTSecurityDescriptor.py ./example_value.txt
+./DescribeNTSecurityDescriptor.py -v ./example_value.txt
 ```
 
 ![example of the output](./.github/example.png)
@@ -56,23 +57,46 @@ Using [DescribeNTSecurityDescriptor.py](./DescribeNTSecurityDescriptor.py), we c
 ## Usage
 
 ```
-$ ./DescribeNTSecurityDescriptor.py 
-usage: DescribeNTSecurityDescriptor.py [-h] [-v] value
+$ ./DescribeNTSecurityDescriptor.py -h
+DescribeNTSecurityDescriptor.py v1.2 - by Podalirius
+
+usage: DescribeNTSecurityDescriptor.py [-h] [-V] [-v VALUE | -D DISTINGUISHEDNAME] [--use-ldaps] [--summary] [--describe] [--dc-ip ip address] [--kdcHost FQDN KDC] [-d DOMAIN] [-u USER]
+                                       [--no-pass | -p PASSWORD | -H [LMHASH:]NTHASH | --aes-key hex key] [-k]
 
 Parse and describe the contents of a raw ntSecurityDescriptor structure
 
-positional arguments:
-  value          The value to be described by the NTSecurityDescriptor
-
 options:
-  -h, --help     show this help message and exit
-  -v, --verbose  Verbose mode. (default: False)
+  -h, --help            show this help message and exit
+  -V, --verbose         Verbose mode. (default: False)
+  -v VALUE, --value VALUE
+                        The value to be described by the NTSecurityDescriptor
+  -D DISTINGUISHEDNAME, --distinguishedName DISTINGUISHEDNAME
+                        The distinguishedName of the object to be described by the NTSecurityDescriptor
+  --use-ldaps           Use LDAPS instead of LDAP
+  --summary             Generate a human readable summary of the rights.
+  --describe            Describe the raw structure.
+
+authentication & connection:
+  --dc-ip ip address    IP Address of the domain controller or KDC (Key Distribution Center) for Kerberos. If omitted it will use the domain part (FQDN) specified in the identity parameter
+  --kdcHost FQDN KDC    FQDN of KDC for Kerberos.
+  -d DOMAIN, --domain DOMAIN
+                        (FQDN) domain to authenticate to
+  -u USER, --user USER  user to authenticate with
+
+  --no-pass             don"t ask for password (useful for -k)
+  -p PASSWORD, --password PASSWORD
+                        password to authenticate with
+  -H [LMHASH:]NTHASH, --hashes [LMHASH:]NTHASH
+                        NT/LM hashes, format is LMhash:NThash
+  --aes-key hex key     AES key to use for Kerberos Authentication (128 or 256 bits)
+  -k, --kerberos        Use Kerberos authentication. Grabs credentials from .ccache file (KRB5CCNAME) based on target parameters. If valid credentials cannot be found, it will use the ones
+                        specified in the command line
 ```
 
 ## Example
 
 ```bash
-./DescribeNTSecurityDescriptor.py -u Administrator -p 'Admin123!' -d LAB --dc-ip 10.0.0.101 -D "CN=user user,CN=Users,DC=LAB,DC=local" --summary --describe
+./DescribeNTSecurityDescriptor.py -u Administrator -p 'Admin123!' -d LAB --dc-ip 10.0.0.101 -D "CN=user user,CN=Users,DC=LAB,DC=local" --describe
 ```
 
 ## Contributing
