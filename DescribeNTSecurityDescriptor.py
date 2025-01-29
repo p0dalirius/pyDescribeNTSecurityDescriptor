@@ -2499,7 +2499,7 @@ class HumanDescriber(object):
 
 
 def parseArgs():
-    print("DescribeNTSecurityDescriptor.py v%s - by @podalirius_\n" % VERSION)
+    print("DescribeNTSecurityDescriptor.py v%s - by Podalirius\n" % VERSION)
 
     parser = argparse.ArgumentParser(add_help=True, description="Parse and describe the contents of a raw ntSecurityDescriptor structure")
 
@@ -2620,8 +2620,18 @@ if __name__ == "__main__":
             print("[+] Loading ntSecurityDescriptor from file '%s'" % options.value)
             filename = options.value
             raw_ntsd_value = open(filename, 'r').read().strip()
+
         if re.compile(r'^[0-9a-fA-F]+$').match(raw_ntsd_value):
+            # Check if the raw_ntsd_value is hex encoded
             raw_ntsd_value = binascii.unhexlify(raw_ntsd_value)
+        
+        elif re.compile(r'^[A-Za-z0-9+/=]+$').match(raw_ntsd_value):
+            # Check if the raw_ntsd_value is base64 encoded
+            try:
+                raw_ntsd_value = binascii.a2b_base64(raw_ntsd_value)
+                print("[+] ntSecurityDescriptor is base64 decoded!")
+            except binascii.Error as e:
+                print("[!] Error decoding base64: %s" % e)
 
     # Parse value
     if raw_ntsd_value is not None:
