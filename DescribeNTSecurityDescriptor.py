@@ -2499,7 +2499,7 @@ class HumanDescriber(object):
 
 
 def parseArgs():
-    print("DescribeNTSecurityDescriptor.py v%s - by Podalirius\n" % VERSION)
+    print("DescribeNTSecurityDescriptor.py v%s - by Remi GASCOU (Podalirius)\n" % VERSION)
 
     parser = argparse.ArgumentParser(add_help=True, description="Parse and describe the contents of a raw ntSecurityDescriptor structure")
 

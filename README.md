@@ -58,7 +58,7 @@ Using [DescribeNTSecurityDescriptor.py](./DescribeNTSecurityDescriptor.py), we c
 
 ```
 $ ./DescribeNTSecurityDescriptor.py -h
-DescribeNTSecurityDescriptor.py v1.2 - by Podalirius
+DescribeNTSecurityDescriptor.py v1.2 - by Remi GASCOU (Podalirius)
 
 usage: DescribeNTSecurityDescriptor.py [-h] [-V] [-v VALUE | -D DISTINGUISHEDNAME] [--use-ldaps] [--summary] [--describe] [--dc-ip ip address] [--kdcHost FQDN KDC] [-d DOMAIN] [-u USER]
                                        [--no-pass | -p PASSWORD | -H [LMHASH:]NTHASH | --aes-key hex key] [-k]
